@@ -1,0 +1,80 @@
+h1 {
+  font-size: x-large;
+  color: blue !important;
+  font-weight: bolder;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+th {
+  vertical-align: top;
+  background-color: lightgray !important;
+}
+
+input, textarea, select {
+  border-color: darkgray !important; /* Cambia "red" al color deseado */
+}
+
+
+.footer{
+  background-color: lightgray;
+}
+
+div{
+  border: 4px  soli red;
+}
+
+
+h1{text-align: center;}
+
+.contra {
+    display: flex;
+   justify-content: center;
+  }
+img{ float: left;}
+
+.custom-bg {
+  background-image: url('fondo.jpeg'); /* Reemplaza 'tu-imagen-de-fondo.jpg' con la ruta de tu imagen de fondo */
+  background-size: cover; /* Ajusta el tamaño de la imagen para cubrir el área del fondo */
+  background-repeat: no-repeat; /* Evita que la imagen de fondo se repita */
+  background-position: center center; /* Centra la imagen de fondo */
+  color: white; /* Cambia el color del texto para que sea legible en el fondo */
+}
+
+button, .btn {
+  margin-top: 20px;
+  margin-bottom: 10px;
+}
+
+.container{
+  margin:30px;
+}
+
+#boleta_tabla_estados td {
+  text-align: center;
+  vertical-align: top;
+}
+.error {
+  color: red;
+  font-weight: bolder;
+}
+
+label {
+font-weight: bolder;
+
+} 
+.image-container {
+  width: 536px;  /* Ajusta el tamaño del contenedor según tus necesidades */
+  height: 536px; /* Ajusta el tamaño del contenedor según tus necesidades */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden; /* Oculta cualquier parte de la imagen que se desborde */
+  margin: 0 auto; /* Centra el contenedor en su elemento padre */
+}
+
+.image-container img {
+  width: 100%; /* Asegúrate de que la imagen ocupe todo el ancho del contenedor */
+  height: 100%; /* Asegúrate de que la imagen ocupe toda la altura del contenedor */
+  object-fit: cover; /* Ajusta la imagen para cubrir el contenedor, recortando si es necesario */
+}

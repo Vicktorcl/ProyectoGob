@@ -1,0 +1,53 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block content %}
+
+<h2 class="text-center">Ingreso de Usuario</h2>
+<div class="container border border-dark p-4" style="width:500px">
+    <form id="form" method="POST" class="text-center">
+
+      {% csrf_token %} 
+      
+      <!-- Botones -->
+      {{ form|as_bootstrap_form }}
+      
+      <div class="text-center mt-4">
+        <button type="submit" class="btn btn-primary"> Ingresar </button>
+      </div>
+      
+      <br>
+      <a href="{% url 'registro' %}">Registrarse</a>
+      <!--Crear Olvido de contraseña-->
+      <a href="#">Olvidé mi Contraseña</a>
+    </form>
+  </div>
+</div>
+
+  <!-- Combobox de usuarios (QUITAR EN VERSION DE PRODUCCION DEL SOFTWARE) -->
+  <!-- NO LO BORRES PARA QUE PUEDAS HACER TUS PRUEBAS MAS RAPIDAMENTE  -->
+  {% comment %} {% include 'common/combobox_usuarios.html' %} {% endcomment %}
+  
+  <br>
+  <br>
+  <br>
+  <br>
+  <br>
+  <br>
+  <br>
+  <br>
+  <br>
+  <br>
+  <br>
+  <br>
+  <br>
+  <br>
+  <br>
+  <br>
+  <br>
+{% endblock content %}
+
+{% block script %}
+  <script src="{% static 'core/js/validador_ingreso.js' %}"></script>
+{% endblock script %}

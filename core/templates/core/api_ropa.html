@@ -1,0 +1,20 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% block content %}
+
+
+    <h1 class="mb-4">Concurso de Ropa</h1>
+
+    <div class="container-fluid">
+
+        <div id="fila-ropa" class="row">
+
+        </div>
+    
+    </div>
+
+    {% endblock content %}
+   
+   {% block script %}
+   <script src="{% static 'core/js/ropa.js' %}" type="text/javascript"></script>
+   {% endblock script %}
