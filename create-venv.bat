@@ -10,3 +10,4 @@ call pip install djangorestframework
 call pip install transbank-sdk
 call pip install django-extensions
 call pip install mssql-django
+call pip install psycopg2-binary
