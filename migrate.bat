@@ -1,4 +1,4 @@
-call C:\ProyectosDjango\Tienda\.venv\Scripts\activate.bat
+call C:\ProyectosDjango\ProyectoGob\.venv\Scripts\activate.bat
 call python manage.py makemigrations
 call python manage.py makemigrations core
 call python manage.py migrate

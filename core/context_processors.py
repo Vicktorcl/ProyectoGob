@@ -1,8 +1,7 @@
-from .models import Carrito
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.utils.safestring import SafeString
-from .forms import ProductoForm, BodegaForm, IngresarForm, UsuarioForm, PerfilForm
+from .forms import IngresarForm, UsuarioForm, PerfilForm
 
 def obtener_datos_usuario(request):
     first_name = ''
@@ -13,15 +12,6 @@ def obtener_datos_usuario(request):
         last_name = usuario.last_name
     return first_name, last_name
 
-def obtener_datos_carrito(request):
-    cantidad_productos = 0
-    mostrar_carrito = False
-    if request.user.is_authenticated:
-        usuario = User.objects.get(pk=request.user.pk)
-        if request.user.perfil.tipo_usuario == 'Cliente':
-            cantidad_productos = Carrito.objects.filter(cliente=request.user.perfil).count()
-            mostrar_carrito = cantidad_productos > 0
-    return mostrar_carrito, cantidad_productos
 
 def get_and_clean_session_variable(request, name):
     value = ''
@@ -67,14 +57,8 @@ def obtener_mensajes(request):
 def global_render(request):
     
     first_name, last_name = obtener_datos_usuario(request)
-    mostrar_carrito, cantidad_productos = obtener_datos_carrito(request)
-    mensajes, tipo_mensaje = obtener_mensajes(request)
 
     return {
-        'mostrar_carrito': mostrar_carrito,
-        'cantidad_productos': cantidad_productos,
         'first_name': first_name,
         'last_name': last_name,
-        'backend_messages': mensajes,
-        'backend_message_type': tipo_mensaje,
     }

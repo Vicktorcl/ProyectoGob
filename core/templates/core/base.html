@@ -87,10 +87,7 @@
           <li>
             <a class="nav-link active" href="{% url 'misdatos' %}"> Mis datos </a></li>
           </li>
-          {% if user.is_authenticated and not user.is_staff or not user.is_authenticated and user.is_superuser%}
-          <li class="nav-item">
-            <a class="nav-link active" aria-current="page" href="{% url 'miscompras' %}"> Mis compras anteriores</a>
-          </li>
+>
           {% endif %}
           <li class="nav-item">
             <a class="nav-link active" aria-current="page" href="{% url 'mipassword' %}"> Cambiar mi contraseña</a>
@@ -103,17 +100,8 @@
               <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" 
                   aria-expanded="false" href="{% url 'ingresar' %}">
                 
-                {% if user.is_superuser %}
-                  <span class="text-danger fw-bold">
-                {% elif user.is_staff %}
-                  <span class="text-success fw-bold">
-                {% else %}
                   <span>
-                {% endif %}
-                  {{ first_name }} {{ last_name }}
-                  {% if user.perfil.subscrito %}
-                    (premium)
-                  {% endif %}
+
                 </span>
 
               </a>
@@ -127,36 +115,6 @@
                 <li><a class="dropdown-item" href="{% url 'salir' %}"> Salir </a></li>
               </ul>
             </li> {% endcomment %}
-          {% endif %}
-          
-
-          <a class="navbar-brand" href="{% url 'api_ropa' %}">
-            <img src="{% static 'core/img/oferta.jpg' %}" class="logo-menu-superior" height="150px" width="70px" style="margin-left: 20px">
-          </a>
-
-
-            
-          {% if user.is_superuser %}
-          <a class="nav-link text-danger fw-bold">
-        {% elif user.is_staff %}
-          <a class="nav-link text-success fw-bold">
-        {% else %}
-          <a class="nav-link">
-        {% endif %}
-          {{ first_name }} {{ last_name }}
-          {% if user.perfil.subscrito %}
-            <span class="badge bg-secondary">(premium)</span>
-          {% endif %}
-        </a>
-        
-          {% if mostrar_carrito %}
-            <li class="nav-item">
-              <a class="nav-link active" aria-current="page" href="{% url 'carrito' %}">
-                <img src="{% static 'core/img/despachado.img' %}" width="32px">
-                {{ cantidad_productos }}
-              </a>
-            </li>
-          {% endif %}
 
   
 
@@ -167,19 +125,7 @@
         
 
         <!-- FORMULARIO DE BUSQUEDA -->
-        {% if not user.is_authenticated or user.is_authenticated and not user.is_staff or not user.is_authenticated and user.is_superuser%}
-        <form method="post" action="{% url 'inicio' %}" class="d-flex" role="search">
-          {% csrf_token %}
 
-          <!-- Caja de texto para escribir lo que el usuario desea buscar. Este
-            campo se recupera en la VISTA por medio de request.POST.get('buscar') -->
-            
-          <input class="form-control" type="search" placeholder="Ingresa tu videojuego" 
-              aria-label="Search" id="buscar" id="buscar" name="buscar">
-          
-          <button class="btn btn-outline-success" type="submit"> Buscar </button>
-        </form>
-        {% endif %}
       </div>
     </div>
   </nav>
@@ -219,9 +165,7 @@
       </footer>
     </div>
 
-    {% comment %} <hr>
-    <a href="{% url 'poblar' %}" clas="btn btn-danger">POBLAR BASE DE DATOS CON REGISTROS PARA PRUEBAS</a>
-  </footer> {% endcomment %}
+
 
   <!-- BLOQUE DE SCRIPTS COMPARTIDOS POR TODAS LAS PAGINAS -->
   <div class="pagelayout-4">

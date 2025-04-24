@@ -16,14 +16,13 @@
       <!-- AREA DE DATOS BASICOS: username, nombre, apellidos, correo y contraseñas -->
       <div class="col">
 
+        {{ form_perfil|as_bootstrap_form }}
+
         {{form_usuario|as_bootstrap_form:'help_text_visible=False' }}
 
 
-
       <!-- AREA DE DATOS DE PERFIL: rut, dirección y subscrito (VER COMENTARIO "CHECKBOX SUBSCRITO" en script.js)  -->
-
-
-        {{ form_perfil|as_bootstrap_form }}
+        
 
       </div>
 

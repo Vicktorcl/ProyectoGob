@@ -2,7 +2,7 @@ from django import forms
 from django.forms import ModelForm, Form
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
-from .models import Categoria, Producto, Perfil
+from .models import Perfil
 
 # *********************************************************************************************************#
 #                                                                                                          #
@@ -23,27 +23,7 @@ from .models import Categoria, Producto, Perfil
 #     con tu diseño gráfico
 # renombra las siguientes etiquetas para que ocupen menos
 # espacio en la página: 'Nombre', 'Subscriptor(%)' y 'Oferta(%)'
-class ProductoForm(ModelForm):
-    class Meta:
-        model = Producto
-        fields = '__all__'
-        widgets = {
-            'descripcion': forms.Textarea(),
-            'imagen': forms.FileInput()
-        }
-        labels = {
-            'nombre': 'Nombre',
-            'descuento_subscriptor': 'Subscriptor(%)',
-            'descuento_oferta': 'Oferta(%)',
-        }
 
-# El formulario de bodega está listo, no necesitas modificarlo
-class BodegaForm(Form):
-    categoria = forms.ModelChoiceField(queryset=Categoria.objects.all(), label='Categoría')
-    producto = forms.ModelChoiceField(queryset=Producto.objects.none(), label='Producto')
-    cantidad = forms.IntegerField(label='Cantidad')
-    class Meta:
-        fields = '__all__'
 
 # El formulario de ingreso está listo, no necesitas modificarlo
 class IngresarForm(Form):
@@ -61,7 +41,7 @@ class IngresarForm(Form):
 class RegistroUsuarioForm(UserCreationForm):
    class Meta:
         model = User
-        fields = ['username', 'first_name', 'last_name', 'email', 'password1', 'password2']
+        fields = ['username','password1', 'password2']
         labels = {
             'email': 'E-mail'
         }
@@ -77,12 +57,8 @@ class RegistroUsuarioForm(UserCreationForm):
 class RegistroPerfilForm(ModelForm):
     class Meta:
         model = Perfil
-        fields = ['rut', 'direccion', 'subscrito', 'imagen']
-        exclude = ['tipo_usuario']
-        widgets = {
-            'direccion': forms.Textarea(),
-            'imagen': forms.FileInput(),
-        }
+        fields = ['rut']
+
 
 # PARA LA PAGINA MIS DATOS Y MANTENEDOR DE USUARIOS:
 # Crear UsuarioForm como una clase que hereda de ModelForm
@@ -92,7 +68,7 @@ class RegistroPerfilForm(ModelForm):
 class UsuarioForm(ModelForm):
    class Meta:
         model = User
-        fields = ['username', 'first_name', 'last_name', 'email']
+        fields = ['username', 'first_name']
         labels = {
             'email': 'E-mail'
         }
@@ -108,8 +84,4 @@ class UsuarioForm(ModelForm):
 class PerfilForm(ModelForm):
     class Meta:
         model = Perfil
-        fields = ['tipo_usuario', 'rut', 'direccion', 'subscrito', 'imagen']
-        widgets = {
-            'direccion': forms.Textarea(),
-            'imagen': forms.FileInput(),
-        }
+        fields = ['rut']
