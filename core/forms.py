@@ -2,39 +2,18 @@ from django import forms
 from django.forms import ModelForm, Form
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
-from .models import Perfil
+from .models import Perfil, Pregunta
 
-# *********************************************************************************************************#
-#                                                                                                          #
-# INSTRUCCIONES PARA EL ALUMNO, PUEDES SEGUIR EL VIDEO TUTORIAL, COMPLETAR EL CODIGO E INCORPORAR EL TUYO: #
-#                                                                                                          #
-# https://drive.google.com/drive/folders/1ObwMnpKmCXVbq3SMwJKlSRE0PCn0buk8?usp=drive_link                  #
-#                                                                                                          #
-# *********************************************************************************************************#
-
-# PARA LA PAGINA MANTENEDOR DE PRODUCTOS:
-# Crea ProductoForm como una clase que hereda de ModelForm
-# asocialo con el modelo Producto
-# muestra todos los campos
-# crea 2 widgets para:
-#   - la descripción del producto como TextArea
-#   - el botón de cargar imagen como FileInput y 
-#     escóndelo para reemplazarlo por otro acorde 
-#     con tu diseño gráfico
-# renombra las siguientes etiquetas para que ocupen menos
-# espacio en la página: 'Nombre', 'Subscriptor(%)' y 'Oferta(%)'
-
-
-# El formulario de ingreso está listo, no necesitas modificarlo
+# Formulario para ingresar un nuevo usuario
 class IngresarForm(Form):
-    username = forms.CharField(widget=forms.TextInput(), label="Cuenta")
+    username = forms.CharField(widget=forms.TextInput(), label="Nombre de usuario")
     password = forms.CharField(widget=forms.PasswordInput(), label="Contraseña")
     class Meta:
         fields = ['username', 'password']
         
 
+# Formulario dinámico para las preguntas de gobernanza de datos
 class GobernanzaForm(forms.Form):
-    """Formulario dinámico para responder preguntas de gobernanza de datos."""
     def __init__(self, *args, **kwargs):
         preguntas = kwargs.pop('preguntas', None)
         super().__init__(*args, **kwargs)
@@ -49,56 +28,47 @@ class GobernanzaForm(forms.Form):
                 required=True,
             )
 
-# PARA LA PAGINA DE REGISTRO DE NUEVO CLIENTE:
-# Crea RegistroUsuarioForm como una clase que hereda de UserCreationForm
-# asocialo con el modelo User
-# muestra los campos: 
-#    'username', 'first_name', 'last_name', 'email', 'password1' y 'password2'
-# renombra la etiqueta del campo 'email' por 'E-mail'
+
+# Formulario para registro de nuevo usuario
 class RegistroUsuarioForm(UserCreationForm):
-   class Meta:
+    class Meta:
         model = User
-        fields = ['username','password1', 'password2']
+        fields = ['username', 'email', 'password1' , 'password2']
         labels = {
-            'email': 'E-mail'
+            'username': 'Nombre de usuario',
+            'email': 'Correo de contacto',
+            'password2': 'Confirme su contraseña'
         }
 
-# PARA LA PAGINA DE REGISTRO DE NUEVO CLIENTE Y MIS DATOS:
-# Crear RegistroPerfilForm como una clase que hereda de ModelForm
-# asocialo con el modelo Perfil
-# muestra los campos: 'rut', 'direccion', 'subscrito', 'imagen'
-# excluye el campo 'tipo_usuario', pues sólo los administradores asignan el tipo
-# crea los widgets para:
-#   - direccion como Textarea,
-#   - imagen como FileInput()
+# Formulario para crear preguntas
+class PreguntaForm(forms.ModelForm):
+    class Meta:
+        model = Pregunta
+        fields = ['dimension', 'criterio', 'texto']
+        widgets = {
+            'dimension': forms.TextInput(attrs={'class': 'form-control'}),
+            'criterio': forms.TextInput(attrs={'class': 'form-control'}),
+            'texto': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+
+# Formulario para registro de nuevo perfil (empresa)
 class RegistroPerfilForm(ModelForm):
     class Meta:
         model = Perfil
-        fields = ['rut']
+        fields = ['rut', 'nombre_empresa']
 
-
-# PARA LA PAGINA MIS DATOS Y MANTENEDOR DE USUARIOS:
-# Crear UsuarioForm como una clase que hereda de ModelForm
-# asocialo con el modelo User
-# muestra todos los campos: 'username', 'first_name', 'last_name' e 'email'
-# renombra la etiqueta del campo 'email' por 'E-mail'
+# Formulario para editar datos de usuario
 class UsuarioForm(ModelForm):
-   class Meta:
+    class Meta:
         model = User
-        fields = ['username', 'first_name']
+        fields = ['username', 'email']
         labels = {
-            'email': 'E-mail'
+            'email': 'Correo'
         }
 
-# PARA LA PAGINA MANTENEDOR DE USUARIOS:
-# Crear PerfilForm como una clase que hereda de ModelForm
-# asocialo con el modelo Perfil
-# muestra todos los campos: 
-#    'tipo_usuario', 'rut', 'direccion', 'subscrito'e 'imagen'
-# crea los widgets para:
-#   - direccion como Textarea,
-#   - imagen como FileInput()
+# Formulario para modificar perfil (empresa)
 class PerfilForm(ModelForm):
     class Meta:
         model = Perfil
-        fields = ['rut']
+        fields = ['rut', 'nombre_empresa']

@@ -1,0 +1,52 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block content %}
+<div class="container border border-dark p-4">
+  <h2 class="text-center">Mantenedor de Preguntas</h2>
+  <br />
+  <form method="POST">
+    {% csrf_token %}
+    {{ form_pregunta|as_bootstrap_form }}
+
+    <div class="mt-2 text-center">
+      <button type="submit" class="btn btn-primary">Guardar</button>
+      <a href="{% url 'mantenedor_preguntas' 'crear' 0 %}" class="btn btn-success">Nueva</a>
+      {% if pregunta %}
+        <a href="{% url 'mantenedor_preguntas' 'eliminar' pregunta.id %}" class="btn btn-danger">Eliminar</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+{% if preguntas %}
+  <div class="container mt-4">
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Dimensión</th>
+          <th>Criterio</th>
+          <th>Texto</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in preguntas %}
+        <tr>
+          <td>{{ p.id }}</td>
+          <td>{{ p.dimension }}</td>
+          <td>{{ p.criterio }}</td>
+          <td>{{ p.texto|truncatechars:50 }}</td>
+          <td>
+            <a href="{% url 'mantenedor_preguntas' 'actualizar' p.id %}" class="btn btn-sm btn-primary">Editar</a>
+            <a href="{% url 'mantenedor_preguntas' 'eliminar' p.id %}" class="btn btn-sm btn-danger">Eliminar</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}

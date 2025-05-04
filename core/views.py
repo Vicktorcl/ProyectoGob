@@ -9,7 +9,7 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.urls import reverse
 from django.core.mail import send_mail
 from .models import Perfil, Pregunta, Respuesta
-from .forms import (GobernanzaForm,
+from .forms import (GobernanzaForm, PreguntaForm,
     IngresarForm, UsuarioForm, PerfilForm,
     RegistroUsuarioForm, RegistroPerfilForm
 )
@@ -29,7 +29,7 @@ def es_usuario_anonimo(user):
 # Vistas públicas (anónimos)
 # ------------------------------------------------------------------------------------------------------
 
-@user_passes_test(es_usuario_anonimo, login_url='nosotros')
+@user_passes_test(es_usuario_anonimo, login_url='gobernanza/')
 def inicio(request):
     """Página de inicio: muestra formulario de login o recibe POST para autenticar."""
     if request.method == "POST":
@@ -41,7 +41,7 @@ def inicio(request):
             if user and user.is_active:
                 login(request, user)
                 messages.success(request, f'¡Bienvenido(a) {user.first_name} {user.last_name}!')
-                return redirect('nosotros')
+                return redirect('gobernanza/')
             messages.error(request, 'Credenciales incorrectas o cuenta desactivada')
         else:
             messages.error(request, 'No se pudo procesar el formulario')
@@ -222,6 +222,36 @@ def mantenedor_usuarios(request, accion, id):
         'accion': accion,
         'usuario': usuario,
     })
+    
+
+@user_passes_test(es_superusuario_activo)
+def mantenedor_preguntas(request, accion, id):
+    pregunta = get_object_or_404(Pregunta, id=id) if int(id) > 0 else None
+
+    if request.method == 'POST':
+        form_pregunta = PreguntaForm(request.POST, instance=pregunta)
+        if form_pregunta.is_valid():
+            form_pregunta.save()
+            messages.success(request, 'Pregunta guardada correctamente.')
+            return redirect('mantenedor_preguntas', accion='actualizar', id=form_pregunta.instance.id)
+        else:
+            messages.error(request, 'No fue posible guardar la pregunta.')
+            show_form_errors(request, [form_pregunta])
+
+    elif request.method == 'GET' and accion == 'eliminar':
+        eliminado, mensaje = eliminar_registro(Pregunta, id)
+        messages.success(request, mensaje)
+        return redirect('mantenedor_preguntas', accion='crear', id=0)
+    else:
+        form_pregunta = PreguntaForm(instance=pregunta)
+
+    preguntas = Pregunta.objects.all()
+    return render(request, 'core/mantenedor_preguntas.html', {
+        'form_pregunta': form_pregunta,
+        'accion': accion,
+        'pregunta': pregunta,
+        'preguntas': preguntas,
+    })
 
 @user_passes_test(es_superusuario_activo)
 def cambiar_password(request):
@@ -270,7 +300,3 @@ def enviar_correo_cambio_password(request, user, password):
 
 def nosotros(request):
     return render(request, 'core/nosotros.html')
-
-
-def administrar_tienda(request):
-    return render(request, 'core/administrar_tienda.html')

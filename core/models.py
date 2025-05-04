@@ -7,11 +7,12 @@ from django.db import connection
 
 
 class Perfil(models.Model):
+    # Relación uno a uno con el modelo User
     usuario = models.OneToOneField(User, on_delete=models.CASCADE)
-    rut = models.CharField(
-        max_length=15,
-        verbose_name='RUT'
-    )
+    
+    # Datos de la empresa
+    rut = models.CharField(max_length=15, verbose_name='Rut de la empresa', unique=True)
+    nombre_empresa = models.CharField(max_length=100, verbose_name='Nombre de la empresa', unique=True)
 
     class Meta:
         db_table = 'Perfil'
@@ -20,7 +21,7 @@ class Perfil(models.Model):
         ordering = ['usuario__username']
 
     def __str__(self):
-        return f'{self.usuario.first_name} {self.usuario.last_name} (ID {self.id})'
+        return f'{self.nombre_empresa} - {self.rut}'
 
     def acciones(self):
         return {
@@ -36,6 +37,13 @@ class Pregunta(models.Model):
     def __str__(self):
         return f"{self.dimension} - {self.criterio}: {self.texto[:50]}..."
 
+    @staticmethod
+    def acciones():
+        return {
+            'accion_eliminar': 'eliminar la pregunta',
+            'accion_crear': 'crear una nueva pregunta',
+            'accion_editar': 'editar la pregunta'
+        }
 class Respuesta(models.Model):
     VALORES = [
         ('si', 'Sí'),

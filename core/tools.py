@@ -67,6 +67,7 @@ def verificar_eliminar_registro(modelo, clave_primaria, debe_eliminar_registro=F
     except Exception as error:
         return False, f'Comuníquese con el Administrador del sistema. ¡No se pudo eliminar el {modelo._meta.verbose_name} "{info_registro}", pues se presentó el siguiente problema: {error}!'
 
+
 def validar_password(password, request=None, add_error_messages=False):
     try:
         validate_password(password)

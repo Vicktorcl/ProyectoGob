@@ -6,21 +6,24 @@
 
 
 <div class="container border border-dark p-4">
-<h2 class="text-center">Registro de Usuario</h2>
+<h2 class="text-center">Registro</h2>
   <form id="form" method="POST" enctype="multipart/form-data">
 
     {% csrf_token %}
 
-    <div class="row">
+    <div class="">
 
       <!-- AREA DE DATOS BASICOS: username, nombre, apellidos, correo y contraseñas -->
-      <div class="col">
+      <div class="row">
+
+        
 
         {{ form_perfil|as_bootstrap_form }}
 
         {{form_usuario|as_bootstrap_form:'help_text_visible=False' }}
 
 
+        
       <!-- AREA DE DATOS DE PERFIL: rut, dirección y subscrito (VER COMENTARIO "CHECKBOX SUBSCRITO" en script.js)  -->
         
 
@@ -30,9 +33,7 @@
       <div class="col-sm-12 col-md-3 text-center">
         <div class="row">
           <!-- AREA DE CUADRO DE IMAGEN: Muestra la Imagen de perfil -->
-          <div class="col-sm-12" style="height: 220px">
-            <img id="cuadro-imagen" src="{% static 'core/img/sin-imagen.png' %}">
-          </div>
+          
         </div>
       </div>
 
@@ -47,7 +48,7 @@
       <button type="reset" id="limpiar_formulario" class="btn btn-success"> Limpiar </button>
       
       <!-- AREA DE BOTON DE SELECCIONAR IMAGEN: Reemplaza el botón "Seleccionar archivo" por otro con Bootstrap (VER COMENTARIO "BOTON IMAGEN" en script.js) -->
-      <button class="btn btn-info"onclick="event.preventDefault(); document.getElementById('id_imagen').click();"> Seleccionar imagen </button>  
+      
       
       <!-- Botón para "Crear usuario de prueba" (VER COMENTARIO "CREAR USUARIO DE PRUEBA" en registrarme.js) -->
       {% comment %} <button id="crear_usuario_prueba" class="btn btn-primary"> Crear usuario de prueba </button> {% endcomment %}

@@ -1,38 +1,26 @@
 from django.urls import path
-from .views import inicio, registro, nosotros
-from .views import ingresar, mantenedor_usuarios
-from .views import misdatos, salir
-from .views import mipassword, cambiar_password, administrar_tienda, formulario_gobernanza, guardar_gobernanza
+from .views import (
+    inicio, registro, nosotros, ingresar, salir, misdatos,
+    mipassword, cambiar_password,
+    formulario_gobernanza, guardar_gobernanza,
+    mantenedor_usuarios, mantenedor_preguntas
+)
 
 urlpatterns = [
     path('', inicio, name='inicio'),
     path('inicio', inicio, name='inicio'),
     path('registro', registro, name='registro'),
     path('nosotros', nosotros, name='nosotros'),
-    # path('productos/<accion>/<id>', productos, name='productos'),
-    # # path('usuarios/<accion>/<id>', usuarios, name='usuarios'),
-    path('mantenedor_usuarios/<accion>/<id>', mantenedor_usuarios, name='mantenedor_usuarios'),
-    path('cambiar_password', cambiar_password, name='cambiar_password'),
-    # path('bodega', bodega, name='bodega'),
-    # path('obtener_productos', obtener_productos, name='obtener_productos'),
-    # path('eliminar_producto_en_bodega/<bodega_id>', eliminar_producto_en_bodega, name='eliminar_producto_en_bodega'),
-    # path('ventas', ventas, name='ventas'),
-    # path('boleta/<nro_boleta>', boleta, name='boleta'),
-    # path('cambiar_estado_boleta/<nro_boleta>/<estado>', cambiar_estado_boleta, name='cambiar_estado_boleta'),
+    
     path('ingresar', ingresar, name='ingresar'),
+    path('salir', salir, name='salir'),
     path('misdatos', misdatos, name='misdatos'),
     path('mipassword', mipassword, name='mipassword'),
-    # path('miscompras', miscompras, name='miscompras'),
-    path('salir', salir, name='salir'),
+    path('cambiar_password', cambiar_password, name='cambiar_password'),
+    
+    path('mantenedor_usuarios/<accion>/<id>', mantenedor_usuarios, name='mantenedor_usuarios'),
+    path('mantenedor_preguntas/<accion>/<id>', mantenedor_preguntas, name='mantenedor_preguntas'),
+    
     path('gobernanza/', formulario_gobernanza, name='formulario_gobernanza'),
-    path('gobernanza/guardar/', guardar_gobernanza, name='guardar_gobernanza'),
-    # path('carrito', carrito, name='carrito'),
-    # path('eliminar_producto_en_carrito/<carrito_id>', eliminar_producto_en_carrito, name='eliminar_producto_en_carrito'),
-    # path('vaciar_carrito', vaciar_carrito, name='vaciar_carrito'),
-    # path('agregar_producto_al_carrito/<producto_id>', agregar_producto_al_carrito, name='agregar_producto_al_carrito'),
-    # path('ficha/<producto_id>', ficha, name='ficha'),
-    # path('comprar_ahora', comprar_ahora, name='comprar_ahora'),
-    # path('api_ropa', api_ropa, name='api_ropa'),
-    # path('poblar', poblar, name='poblar'),
-    path('administrar_tienda', administrar_tienda, name='administrar_tienda')
+    path('gobernanza/guardar/', guardar_gobernanza, name='guardar_gobernanza')
 ]

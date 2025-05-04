@@ -29,18 +29,6 @@ $(document).ready(function() {
         'username': {
           required: true,
         },
-        'tipo_usuario': {
-          required: true,
-          inList: ['Cliente', 'Administrador'],
-        },
-        'first_name': {
-          required: true,
-          soloLetras: true,
-        },
-        'last_name': {
-          required: true,
-          soloLetras: true,
-        },
         'email': {
           required: true,
           emailCompleto: true,

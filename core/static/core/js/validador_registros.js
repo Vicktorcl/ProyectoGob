@@ -1,6 +1,6 @@
 // static/core/js/validacion_registro.js
 
- $(document).ready(function() {
+$(document).ready(function() {
 
   // 1) Método para validar RUT chileno (formato NNNNNNNN-DV, sin puntos)
   $.validator.addMethod("rutChileno", function(value, element) {
