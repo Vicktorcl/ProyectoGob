@@ -31,6 +31,23 @@ class IngresarForm(Form):
     password = forms.CharField(widget=forms.PasswordInput(), label="Contraseña")
     class Meta:
         fields = ['username', 'password']
+        
+
+class GobernanzaForm(forms.Form):
+    """Formulario dinámico para responder preguntas de gobernanza de datos."""
+    def __init__(self, *args, **kwargs):
+        preguntas = kwargs.pop('preguntas', None)
+        super().__init__(*args, **kwargs)
+        if preguntas is None:
+            preguntas = Pregunta.objects.all()
+        for pregunta in preguntas:
+            field_name = f'respuesta_{pregunta.id}'
+            self.fields[field_name] = forms.ChoiceField(
+                label=f"{pregunta.dimension} – {pregunta.criterio}: {pregunta.texto}",
+                choices=[('si', 'Sí'), ('no', 'No')],
+                widget=forms.RadioSelect(attrs={'class': 'respuesta-btn'}),
+                required=True,
+            )
 
 # PARA LA PAGINA DE REGISTRO DE NUEVO CLIENTE:
 # Crea RegistroUsuarioForm como una clase que hereda de UserCreationForm

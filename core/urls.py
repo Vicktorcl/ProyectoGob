@@ -2,7 +2,7 @@ from django.urls import path
 from .views import inicio, registro, nosotros
 from .views import ingresar, mantenedor_usuarios
 from .views import misdatos, salir
-from .views import mipassword, cambiar_password, administrar_tienda
+from .views import mipassword, cambiar_password, administrar_tienda, formulario_gobernanza, guardar_gobernanza
 
 urlpatterns = [
     path('', inicio, name='inicio'),
@@ -24,6 +24,8 @@ urlpatterns = [
     path('mipassword', mipassword, name='mipassword'),
     # path('miscompras', miscompras, name='miscompras'),
     path('salir', salir, name='salir'),
+    path('gobernanza/', formulario_gobernanza, name='formulario_gobernanza'),
+    path('gobernanza/guardar/', guardar_gobernanza, name='guardar_gobernanza'),
     # path('carrito', carrito, name='carrito'),
     # path('eliminar_producto_en_carrito/<carrito_id>', eliminar_producto_en_carrito, name='eliminar_producto_en_carrito'),
     # path('vaciar_carrito', vaciar_carrito, name='vaciar_carrito'),
