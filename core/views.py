@@ -8,6 +8,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import PasswordChangeForm
 from django.urls import reverse
 from django.core.mail import send_mail
+from django.db.models.functions import TruncDate
 from collections import defaultdict
 from .models import Perfil, Pregunta, Respuesta
 from .forms import (
@@ -144,15 +145,54 @@ def registro(request):
 
 @login_required
 @user_passes_test(es_superusuario_activo)
-def mantenedor_respuestas(request):
-    users = User.objects.all().select_related('perfil')
+def mantenedor_respuestas(request, accion='listar', id=0):
+    """
+    CRUD para el mantenedor de respuestas:
+     - 'listar' (o cualquier otro valor): lista usuarios con al menos una respuesta
+     - 'ver': redirige a la vista de reporte de respuestas para ese usuario
+     - 'eliminar': borra todas las respuestas del usuario
+    """
+    usuario = get_object_or_404(User, pk=id) if int(id) > 0 else None
+
+    # VER reporte
+    if accion == 'ver' and usuario:
+        # redirige a tu ruta 'respuestas' con el user_id
+        return redirect('respuestas', user_id=usuario.id)
+
+    # ELIMINAR todas sus respuestas
+    if accion == 'eliminar' and usuario:
+        Respuesta.objects.filter(usuario=usuario).delete()
+        messages.success(request, f'Todas las respuestas de "{usuario.username}" han sido eliminadas.')
+        return redirect('mantenedor_respuestas')
+
+    # LISTAR usuarios que tienen al menos una respuesta
+    users_con_respuestas = (
+        User.objects
+            .filter(respuesta__isnull=False)
+            .distinct()
+            .select_related('perfil')
+    )
+
     return render(request, 'core/mantenedor_respuestas.html', {
-        'users': users
+        'users': users_con_respuestas,
+        'accion': accion,
+        'usuario': usuario,
     })
 
 @login_required
-def respuestas_view(request):
-    respuestas = Respuesta.objects.filter(usuario=request.user)
+def respuestas_view(request, user_id=None):
+    """
+    Muestra el reporte de respuestas de un usuario.
+    Si eres superusuario y pasas user_id, muestra ese usuario; si no, tu propio reporte.
+    """
+    # --- Determinar sobre quién consulto ---
+    if user_id and request.user.is_superuser:
+        target_user = get_object_or_404(User, id=user_id)
+    else:
+        target_user = request.user
+
+    # --- Obtengo sus respuestas ---
+    respuestas = Respuesta.objects.filter(usuario=target_user)
 
     # 1) Cálculo por dimensión
     scores = defaultdict(lambda: {'si': 0, 'total': 0})
@@ -175,12 +215,10 @@ def respuestas_view(request):
 
     # 2) Totales globales
     total_raw    = sum(v['raw'] for v in dimension_scores.values())
-    total_maxraw = sum(v['total'] for v in scores.values())  # total preguntas
+    total_maxraw = sum(v['total'] for v in scores.values())
     total_pct    = (total_raw / total_maxraw * 100) if total_maxraw else 0
 
-    # 3) Puntaje ponderado: 
-    #    Si quieres replicar tu ejemplo (260 vs 312), estableces max_weighted en 260.
-    #    O bien lo calculas como total_maxraw * factor. Aquí lo fijamos en 260.
+    # 3) Puntaje ponderado (ejemplo fijado a 260)
     max_weighted   = 260
     total_weighted = total_raw * (max_weighted / total_maxraw) if total_maxraw else 0
 
@@ -194,23 +232,24 @@ def respuestas_view(request):
     else:
         nivel_global = 'Avanzado'
 
-    # 5) Para el radar
+    # 5) Datos para el radar
     dim_labels = list(dimension_scores.keys())
-    dim_user   = [round(d['pct'],1) for d in dimension_scores.values()]
+    dim_user   = [round(d['pct'], 1) for d in dimension_scores.values()]
     dim_max    = [100] * len(dim_labels)
 
     return render(request, 'core/respuestas.html', {
-        'respuestas':      respuestas,
+        'target_user':      target_user,
+        'respuestas':       respuestas,
         'dimension_scores': dimension_scores,
-        'total_raw':       total_raw,
-        'total_weighted':  total_weighted,
-        'total_pct':       total_pct,
-        'nivel_global':    nivel_global,
-        'total_maxraw':    total_maxraw,
-        'max_weighted':    max_weighted,
-        'dim_labels':      dim_labels,
-        'dim_user':        dim_user,
-        'dim_max':         dim_max,
+        'total_raw':        total_raw,
+        'total_weighted':   total_weighted,
+        'total_pct':        total_pct,
+        'nivel_global':     nivel_global,
+        'total_maxraw':     total_maxraw,
+        'max_weighted':     max_weighted,
+        'dim_labels':       dim_labels,
+        'dim_user':         dim_user,
+        'dim_max':          dim_max,
     })
 
 # ------------------------------------------------------------------------------------------------------
