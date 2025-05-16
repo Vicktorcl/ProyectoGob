@@ -1,0 +1,29 @@
+{% extends 'core/base.html' %}
+{% block title %}Mantenedor de Respuestas{% endblock title %}
+{% block content %}
+<div class="container my-5">
+  <h2 class="mb-4 text-center">Mantenedor de Respuestas</h2>
+  <table class="table table-hover">
+    <thead>
+      <tr>
+        <th>ID</th><th>Usuario</th><th>Empresa</th><th>Acción</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in users %}
+      <tr>
+        <td>{{ user.id }}</td>
+        <td>{{ user.username }}</td>
+        <td>{{ user.perfil.nombre_empresa }}</td>
+        <td>
+          <a href="{% url 'respuestas_usuario' user.id %}"
+             class="btn btn-sm btn-primary">
+            Ver Respuestas
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock content %}

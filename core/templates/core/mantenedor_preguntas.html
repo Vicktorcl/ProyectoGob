@@ -20,6 +20,13 @@
   </form>
 </div>
 
+{% if user.is_superuser and user.is_active %}
+<a href="{% url 'poblar_bd' %}" class="btn btn-warning"
+   onclick="return confirm('¿Seguro de poblar la BD? Se sobrescribirán preguntas y respuestas existentes.');">
+  Poblar BD
+</a>
+{% endif %}
+
 {% if preguntas %}
   <div class="container mt-4">
     <table class="table table-hover">
@@ -48,5 +55,6 @@
       </tbody>
     </table>
   </div>
+
 {% endif %}
 {% endblock %}

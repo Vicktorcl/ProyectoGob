@@ -21,13 +21,7 @@
       <!-- AREA DE CUADRO DE IMAGEN: Imagen de perfil (VER COMENTARIO "CUADRO DE IMAGEN" en script.js) -->
       <div class="col-1">
         <div class="row">
-          <div class="col-sm-12" style="height: 250px">
-            {% if form_perfil.imagen.value %}
-              <img id="cuadro-imagen" src="/media/{{ form_perfil.imagen.value }}">
-            {% else %}
-              <img id="cuadro-imagen" src="{% static 'core/img/sin-imagen.png' %}">
-            {% endif %}
-          </div>
+
         </div>
       </div>
 
@@ -42,12 +36,6 @@
         <a href="{% url 'mantenedor_usuarios' 'crear' '0' %}" class="btn btn-success "> Nuevo </a>
 
         <!-- AREA DE BOTON DE SELECCIONAR IMAGEN: Reemplaza el botón "Seleccionar archivo" por otro con Bootstrap (VER COMENTARIO "BOTON IMAGEN" en script.js) -->
-        <button onclick="event.preventDefault(); document.getElementById('id_imagen').click();" class="btn btn-info "> Seleccionar imagen </button>  
-
-        {% if form_usuario.instance.id %}
-          <a class="btn btn-danger" href="{% url 'mantenedor_usuarios' 'eliminar' form_usuario.instance.id %}"> Eliminar </a>
-        {% endif %}
-      
       </div>
     
     </form>
@@ -89,7 +77,6 @@
           
             <td> {% if usuario.perfil.subscrito %} Sí {% else %} No {% endif %} </td>
             <td>
-              <img src="/media/{{ usuario.perfil.imagen }}" class="usuario-sm" alt="">
             </td>
             <td>
               <div class="btn-group">

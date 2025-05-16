@@ -1,0 +1,169 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Reporte de Gobernanza de Datos{% endblock title %}
+
+{% block content %}
+<div class="container my-5">
+  <h2 class="mb-4 text-center">Reporte de Gobernanza de Datos</h2>
+
+  {# --- Resumen global --- #}
+  <table class="table table-bordered mb-4">
+    <thead class="table-light">
+      <tr>
+        <th>Institución</th>
+        <th>Puntaje total obtenido</th>
+        <th>Puntaje ponderado</th>
+        <th>Porcentaje</th>
+        <th>Nivel Madurez Global</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>{{ request.user.perfil.nombre_empresa }}</td>
+        {# total_raw es número de respuestas 'sí'; lo multiplicamos por 6 #}
+        <td>{% widthratio total_raw 1 6 %}</td>
+        <td>{{ total_weighted|floatformat:0 }}</td>
+        <td>{{ total_pct|floatformat:1 }}%</td>
+        <td>{{ nivel_global }}</td>
+      </tr>
+      <tr class="table-secondary">
+        <th>Puntaje máximo:</th>
+        {# total_maxraw es cantidad de preguntas; lo multiplicamos por 6 #}
+        <td>{% widthratio total_maxraw 1 6 %}</td>
+        <td>{{ max_weighted }}</td>
+        <td colspan="2"></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="row">
+    {# --- Gráfico + tabla dimensión --- #}
+    <div class="col-md-6">
+      <canvas id="radarChart" height="350"></canvas>
+    </div>
+    <div class="col-md-6">
+      <h4>Puntajes por Dimensión</h4>
+      <table class="table table-hover">
+        <thead class="table-light">
+          <tr>
+            <th>Dimensión</th>
+            <th>Puntaje obtenido</th>
+            <th>% Puntaje</th>
+            <th>Nivel de Madurez</th>
+            <th>Ponderación dimensión</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for dim, data in dimension_scores.items %}
+            {% with raw=data.raw pct=data.pct %}
+            <tr>
+              <td>{{ dim }}</td>
+              {# raw es número de 'sí'; lo multiplicamos por 6 #}
+              <td>{% widthratio raw 1 6 %}</td>
+              <td>{{ pct|floatformat:0 }}%</td>
+              <td>
+                {% if pct < 25 %}
+                  Insuficiente
+                {% elif pct < 50 %}
+                  Básico
+                {% elif pct < 75 %}
+                  Medio
+                {% else %}
+                  Avanzado
+                {% endif %}
+              </td>
+              <td>8,3 %</td>
+            </tr>
+            {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block script %}
+  {{ dim_labels|json_script:"dimLabels" }}
+  {{ dim_user|json_script:"dimUser" }}
+  {{ dim_max|json_script:"dimMax" }}
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+  <script>
+    const labels   = JSON.parse(document.getElementById('dimLabels').textContent);
+    const userData = JSON.parse(document.getElementById('dimUser').textContent);
+    const maxData  = JSON.parse(document.getElementById('dimMax').textContent);
+
+    // Niveles fijos
+    const basicLvl  = labels.map(() => 40);
+    const mediumLvl = labels.map(() => 60);
+    const advLvl    = labels.map(() => 80);
+
+    new Chart(
+      document.getElementById('radarChart'),
+      {
+        type: 'radar',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Usuario',
+              data: userData,
+              fill: true,
+              backgroundColor: 'rgba(54,162,235,0.2)',
+              borderColor: 'rgb(54,162,235)',
+            },
+            {
+              label: 'Básico 40 %',
+              data: basicLvl,
+              fill: false,
+              borderColor: 'rgb(255,99,132)',
+              borderDash: [5,5],
+              pointRadius: 0
+            },
+            {
+              label: 'Medio 60 %',
+              data: mediumLvl,
+              fill: false,
+              borderColor: 'rgb(255,159,64)',
+              borderDash: [5,5],
+              pointRadius: 0
+            },
+            {
+              label: 'Avanzado 80 %',
+              data: advLvl,
+              fill: false,
+              borderColor: 'rgb(75,192,192)',
+              borderDash: [5,5],
+              pointRadius: 0
+            },
+            {
+              label: 'Máximo 100 %',
+              data: maxData,
+              fill: false,
+              borderColor: 'rgb(0,0,0)',
+              borderDash: [2,2],
+              pointRadius: 0
+            }
+          ]
+        },
+        options: {
+          scales: {
+            r: {
+              beginAtZero: true,
+              max: 100,
+              ticks: {
+                stepSize: 20,
+                callback: v => v + '%'
+              }
+            }
+          },
+          plugins: {
+            legend: { position: 'top' }
+          }
+        }
+      }
+    );
+  </script>
+{% endblock script %}

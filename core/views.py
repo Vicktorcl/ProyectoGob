@@ -8,12 +8,16 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import PasswordChangeForm
 from django.urls import reverse
 from django.core.mail import send_mail
+from collections import defaultdict
 from .models import Perfil, Pregunta, Respuesta
-from .forms import (GobernanzaForm, PreguntaForm,
+from .forms import (
+    GobernanzaForm, PreguntaForm, 
     IngresarForm, UsuarioForm, PerfilForm,
     RegistroUsuarioForm, RegistroPerfilForm
 )
 from .tools import eliminar_registro, show_form_errors
+# Importar función de poblamiento
+from core.zpoblar import poblar_bd
 
 # ------------------------------------------------------------------------------------------------------
 # Funciones auxiliares para autorización
@@ -29,7 +33,7 @@ def es_usuario_anonimo(user):
 # Vistas públicas (anónimos)
 # ------------------------------------------------------------------------------------------------------
 
-@user_passes_test(es_usuario_anonimo, login_url='gobernanza/')
+@user_passes_test(es_usuario_anonimo, login_url='formulario_gobernanza')
 def inicio(request):
     """Página de inicio: muestra formulario de login o recibe POST para autenticar."""
     if request.method == "POST":
@@ -41,7 +45,7 @@ def inicio(request):
             if user and user.is_active:
                 login(request, user)
                 messages.success(request, f'¡Bienvenido(a) {user.first_name} {user.last_name}!')
-                return redirect('gobernanza/')
+                return redirect('formulario_gobernanza')
             messages.error(request, 'Credenciales incorrectas o cuenta desactivada')
         else:
             messages.error(request, 'No se pudo procesar el formulario')
@@ -49,7 +53,7 @@ def inicio(request):
     else:
         form = IngresarForm()
 
-    return render(request, 'core/inicio.html', { 'form': form })
+    return render(request, 'core/inicio.html', {'form': form})
 
 @login_required
 def formulario_gobernanza(request):
@@ -108,7 +112,7 @@ def ingresar(request):
     else:
         form = IngresarForm()
 
-    return render(request, 'core/ingresar.html', { 'form': form })
+    return render(request, 'core/ingresar.html', {'form': form})
 
 @user_passes_test(es_usuario_anonimo, login_url='inicio')
 def registro(request):
@@ -135,7 +139,82 @@ def registro(request):
     })
 
 # ------------------------------------------------------------------------------------------------------
-# Vistas para usuarios autenticados
+# Vista de reporte de respuestas y puntajes
+# ------------------------------------------------------------------------------------------------------
+
+@login_required
+@user_passes_test(es_superusuario_activo)
+def mantenedor_respuestas(request):
+    users = User.objects.all().select_related('perfil')
+    return render(request, 'core/mantenedor_respuestas.html', {
+        'users': users
+    })
+
+@login_required
+def respuestas_view(request):
+    respuestas = Respuesta.objects.filter(usuario=request.user)
+
+    # 1) Cálculo por dimensión
+    scores = defaultdict(lambda: {'si': 0, 'total': 0})
+    for r in respuestas:
+        dim = r.pregunta.dimension
+        scores[dim]['total'] += 1
+        if r.valor == 'si':
+            scores[dim]['si'] += 1
+
+    # Raw y porcentaje por dimensión
+    dimension_scores = {}
+    for dim, v in scores.items():
+        si = v['si']
+        total = v['total']
+        pct = (si / total * 100) if total else 0
+        dimension_scores[dim] = {
+            'raw': si,
+            'pct': pct,
+        }
+
+    # 2) Totales globales
+    total_raw    = sum(v['raw'] for v in dimension_scores.values())
+    total_maxraw = sum(v['total'] for v in scores.values())  # total preguntas
+    total_pct    = (total_raw / total_maxraw * 100) if total_maxraw else 0
+
+    # 3) Puntaje ponderado: 
+    #    Si quieres replicar tu ejemplo (260 vs 312), estableces max_weighted en 260.
+    #    O bien lo calculas como total_maxraw * factor. Aquí lo fijamos en 260.
+    max_weighted   = 260
+    total_weighted = total_raw * (max_weighted / total_maxraw) if total_maxraw else 0
+
+    # 4) Nivel de madurez global
+    if total_pct < 25:
+        nivel_global = 'Insuficiente'
+    elif total_pct < 50:
+        nivel_global = 'Básico'
+    elif total_pct < 75:
+        nivel_global = 'Medio'
+    else:
+        nivel_global = 'Avanzado'
+
+    # 5) Para el radar
+    dim_labels = list(dimension_scores.keys())
+    dim_user   = [round(d['pct'],1) for d in dimension_scores.values()]
+    dim_max    = [100] * len(dim_labels)
+
+    return render(request, 'core/respuestas.html', {
+        'respuestas':      respuestas,
+        'dimension_scores': dimension_scores,
+        'total_raw':       total_raw,
+        'total_weighted':  total_weighted,
+        'total_pct':       total_pct,
+        'nivel_global':    nivel_global,
+        'total_maxraw':    total_maxraw,
+        'max_weighted':    max_weighted,
+        'dim_labels':      dim_labels,
+        'dim_user':        dim_user,
+        'dim_max':         dim_max,
+    })
+
+# ------------------------------------------------------------------------------------------------------
+# Vistas para usuarios autenticados y superusuarios
 # ------------------------------------------------------------------------------------------------------
 
 @login_required
@@ -183,11 +262,7 @@ def mipassword(request):
     else:
         form = PasswordChangeForm(user=request.user)
 
-    return render(request, 'core/mipassword.html', { 'form': form })
-
-# ------------------------------------------------------------------------------------------------------
-# Vistas exclusivas para superusuario
-# ------------------------------------------------------------------------------------------------------
+    return render(request, 'core/mipassword.html', {'form': form})
 
 @user_passes_test(es_superusuario_activo)
 def mantenedor_usuarios(request, accion, id):
@@ -222,7 +297,6 @@ def mantenedor_usuarios(request, accion, id):
         'accion': accion,
         'usuario': usuario,
     })
-    
 
 @user_passes_test(es_superusuario_activo)
 def mantenedor_preguntas(request, accion, id):
@@ -273,30 +347,14 @@ def cambiar_password(request):
             messages.error(request, 'El usuario no existe.')
     return redirect('mantenedor_usuarios', accion='crear', id=0)
 
-
-def enviar_correo_cambio_password(request, user, password):
-    try:
-        subject = 'Cambio de contraseña'
-        login_url = reverse('ingresar')
-        html_message = render(request, 'common/formato_correo.html', {
-            'first_name': user.first_name,
-            'last_name': user.last_name,
-            'user_password': password,
-            'link_to_login': request.build_absolute_uri(login_url),
-        }).content.decode('utf-8')
-        send_mail(
-            subject,
-            '',
-            'info@tuempresa.com',
-            [user.email],
-            html_message=html_message
-        )
-        return True
-    except Exception:
-        return False
+# Nueva vista para poblar BD
+@user_passes_test(es_superusuario_activo)
+def poblar_bd_view(request):
+    poblar_bd()
+    messages.success(request, 'Base de datos poblada con preguntas y respuestas.')
+    return redirect('formulario_gobernanza')
 
 # Otras vistas generales
-
 
 def nosotros(request):
     return render(request, 'core/nosotros.html')
