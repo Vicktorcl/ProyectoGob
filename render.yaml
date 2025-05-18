@@ -2,27 +2,31 @@ services:
   - type: web
     name: tienda-web
     env: python
+    # Variables de entorno
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: proyecto-gob-db
+          property: connectionString
+      - key: ALLOWED_HOSTS
+        value: proyectogob-1.onrender.com,localhost,127.0.0.1
     # Comandos de build: instala dependencias, aplica migraciones y recoge estáticos
     buildCommand: |
       pip install -r requirements.txt
       python manage.py migrate
       python manage.py collectstatic --noinput
-    # Comando para arrancar tu app
-    startCommand: gunicorn tienda.wsgi
+    # Comando para arrancar tu app (incluye migraciones por si acaso)
+    startCommand: |
+      python manage.py migrate
+      gunicorn tienda.wsgi
     # Después del despliegue, crea el superusuario si no existe
     postdeploy: |
       python manage.py shell << 'EOF'
 from django.contrib.auth.models import User
-if not User.objects.filter(username='admin').exists():
+if not User.objects.filter(username='super123').exists():
     User.objects.create_superuser(
       'super123',
       'victorrigocl@gmail.com',
       'Elolvidado21?'
     )
 EOF
-    # Variables de entorno adicionales (puedes definirlas también en el Dashboard)
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: proyecto-gob-db
-          property: connectionString
