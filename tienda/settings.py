@@ -82,7 +82,7 @@ WSGI_APPLICATION = 'tienda.wsgi.application'
 # CONEXION A BD SQLITE
 DATABASES = {
     'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL'),
+        default=os.environ.get('postgresql://postgres_user:3PnYOHudHT8gM9G8RfCXhvylGq95K2Ca@dpg-d0km2f3uibrs739l37ig-a/postgres_db_5tmp'),
         conn_max_age=600,
         ssl_require=True
     )
