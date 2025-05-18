@@ -1,3 +1,5 @@
+version: 1
+
 services:
   - type: web
     name: tienda-web
@@ -23,7 +25,7 @@ services:
     postdeploy: |
       python manage.py shell << 'EOF'
 from django.contrib.auth.models import User
-if not User.objects.filter(username='super123').exists():
+if not User.objects.filter(username=='super123').exists():
     User.objects.create_superuser(
       'super123',
       'victorrigocl@gmail.com',
