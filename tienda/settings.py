@@ -12,8 +12,9 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from pathlib import Path
 from os import path
+import os
+import dj_database_url  # Build paths inside the project like this: BASE_DIR / 'subdir'.
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -26,6 +27,7 @@ SECRET_KEY = 'django-insecure-s&f92x^bztt53afi6l)oj-!1%aa6v9=ki@9p%lo!bu_wkx16c(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+# Hosts
 ALLOWED_HOSTS = ['proyectogob-1.onrender.com']
 
 
@@ -45,6 +47,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # <-- Added for static files
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -79,14 +82,16 @@ WSGI_APPLICATION = 'tienda.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-# CONEXION A BD SQLITE
 DATABASES = {
     'default': dj_database_url.config(
-        default=os.environ.get('postgresql://postgres_user:3PnYOHudHT8gM9G8RfCXhvylGq95K2Ca@dpg-d0km2f3uibrs739l37ig-a/postgres_db_5tmp'),
+        default=os.environ.get('DATABASE_URL'),  # Use Render's DATABASE_URL env var
         conn_max_age=600,
         ssl_require=True
     )
 }
+
+# CONEXION A BD SQLITE
+# (Desactivada al usar PostgreSQL)
 
 # CONEXION A BD ORACLE
 # DATABASES = {
@@ -118,6 +123,7 @@ DATABASES = {
 #     },
 # }
 
+
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
 
@@ -144,10 +150,13 @@ LANGUAGE_CODE = 'es-cl'
 
 TIME_ZONE = 'America/Santiago'
 
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'  # <-- Added for collectstatic
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'  # <-- Use WhiteNoise
 
 # Parámetros para poder subir archivos a la carpeta "media"
 
