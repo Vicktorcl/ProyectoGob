@@ -12,7 +12,7 @@ services:
           name: proyecto-gob-db
           property: connectionString
       - key: ALLOWED_HOSTS
-        value: "proyectogob-1.onrender.com"
+        value: "proyectogob-1.onrender.com,localhost,127.0.0.1"
 
     # Build: instala dependencias, aplica migraciones y recoge estáticos
     buildCommand: |
@@ -20,13 +20,13 @@ services:
       python manage.py migrate --noinput
       python manage.py collectstatic --noinput
 
-    # Start: migra de nuevo (por si acaso) y arranca Gunicorn
+    # Start: migra de nuevo y arranca Gunicorn
     startCommand: |
       python manage.py migrate --noinput
       gunicorn tienda.wsgi:application
 
-    # Post-deploy: crea el superusuario si no existe
-    Deploy: |
+    # Hook tras el despliegue: crea superusuario si no existe
+    deployCommand: |
       python manage.py shell << 'EOF'
       from django.contrib.auth.models import User
       if not User.objects.filter(username='super123').exists():
