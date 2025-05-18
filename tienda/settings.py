@@ -81,14 +81,11 @@ WSGI_APPLICATION = 'tienda.wsgi.application'
 
 # CONEXION A BD SQLITE
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'postgres',
-        'USER': 'postgres',
-        'PASSWORD': 'SYSTEM',
-        'HOST': '127.0.0.1',
-        'PORT': '5432',
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL'),
+        conn_max_age=600,
+        ssl_require=True
+    )
 }
 
 # CONEXION A BD ORACLE
