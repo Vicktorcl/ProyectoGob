@@ -9,8 +9,27 @@ from django.core.management import call_command
 from django.db.utils import OperationalError
 
 try:
-    # Aplica las migraciones pendientes sin pedir interacción
     call_command('migrate', interactive=False)
 except OperationalError:
-    # La base de datos aún no está lista: lo ignoramos y seguimos.
+    # Si la BD no está lista aún, lo ignoramos
     pass
+
+# —————— AUTO-CREATE SUPERUSER ON STARTUP ——————
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+username = os.environ.get('DJANGO_SUPERUSER_USERNAME')
+email    = os.environ.get('DJANGO_SUPERUSER_EMAIL')
+password = os.environ.get('DJANGO_SUPERUSER_PASSWORD')
+
+if username and password:
+    try:
+        if not User.objects.filter(username=username).exists():
+            User.objects.create_superuser(
+                username=username,
+                email=email or '',
+                password=password
+            )
+    except OperationalError:
+        # Si la BD no está lista o hay otro error, lo ignoramos
+        pass
