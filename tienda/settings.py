@@ -1,3 +1,4 @@
+
 """
 Django settings for tienda project.
 
@@ -15,8 +16,8 @@ from os import path
 import os
 import dj_database_url  # Build paths inside the project like this: BASE_DIR / 'subdir'.
 
+# Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -25,14 +26,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-s&f92x^bztt53afi6l)oj-!1%aa6v9=ki@9p%lo!bu_wkx16c('
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
 # Hosts
-ALLOWED_HOSTS = ['proyectogob-1.onrender.com']
-
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'proyectogob-1.onrender.com').split(',')
 
 # Application definition
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -47,7 +46,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # <-- Added for static files
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Serve static files
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -78,20 +77,25 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'tienda.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-
-DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL'),  # Use Render's DATABASE_URL env var
-        conn_max_age=600,
-        ssl_require=True
-    )
-}
-
-# CONEXION A BD SQLITE
-# (Desactivada al usar PostgreSQL)
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=True
+        )
+    }
+else:
+    # Fallback to SQLite for local development
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': str(BASE_DIR / 'db.sqlite3'),
+        }
+    }
 
 # CONEXION A BD ORACLE
 # DATABASES = {
@@ -123,10 +127,8 @@ DATABASES = {
 #     },
 # }
 
-
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -142,35 +144,27 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
-
 LANGUAGE_CODE = 'es-cl'
-
 TIME_ZONE = 'America/Santiago'
-
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
-
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'  # <-- Added for collectstatic
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'  # <-- Use WhiteNoise
+STATIC_ROOT = BASE_DIR / 'staticfiles'  # Where collectstatic collects static files
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'  # <-- Use CompressedStaticFilesStorage to avoid manifest errors
 
 # Parámetros para poder subir archivos a la carpeta "media"
-
 MEDIA_ROOT = path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
 
 # Parámetros para inicio de sesión
-
 LOGIN_URL = '/ingresar'
 LOGIN_REDIRECT_URL = '/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CONFIGURACIÓN PARA ENVIAR CORREOS ELECTRÓNICOS A TRAVÉS DEL SERVIDOR DE GMAIL
@@ -185,12 +179,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # 7. En combobox "Seleccionar app" escoger "Otra (nombre personalizado)" y escibir "faithfulpet" (nombre de mi aplicación)
 # 8. Presionar en botón "Generar"
 # 9. Copiar la password 16 letras que aparece en pantalla y asignarla a la variable "EMAIL_HOST_PASSWORD"
-# 10. Configurar las variables 
+# 10. Configurar las variables
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'info.faithfulpet@gmail.com'  # Reemplaza con tu dirección de correo Gmail
-EMAIL_HOST_PASSWORD = 'qilcuwkdxlerbqae' # Reemplaza con tu contraseña de "aplicación generada"
+EMAIL_HOST_USER = 'info.faithfulpet@gmail.com'
+EMAIL_HOST_PASSWORD = 'qilcuwkdxlerbqae'
 X_FRAME_OPTIONS = 'SAMEORIGIN'
+
