@@ -74,7 +74,9 @@ class Encuesta(models.Model):
     Representa una ejecución de la encuesta por parte de un usuario.
     Se genera una nueva instancia por cada envío del formulario.
     """
-    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL,
+        null=True,
+        blank=True)
     fecha = models.DateTimeField(auto_now_add=True)
 
     class Meta:
