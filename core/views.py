@@ -8,9 +8,10 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import PasswordChangeForm
 from django.urls import reverse
 from django.core.mail import send_mail
+from django.urls import reverse
 from django.db.models.functions import TruncDate
 from collections import defaultdict
-from .models import Perfil, Pregunta, Respuesta
+from .models import Perfil, Pregunta, Respuesta, Encuesta
 from .forms import (
     GobernanzaForm, PreguntaForm, 
     IngresarForm, UsuarioForm, PerfilForm,
@@ -81,17 +82,26 @@ def formulario_gobernanza(request):
 
 @login_required
 def guardar_gobernanza(request):
-    """Procesa y guarda las respuestas enviadas desde el formulario."""
+    """Procesa y guarda las respuestas como una nueva Encuesta."""
     if request.method == 'POST':
+        # 1) Creamos una nueva encuesta para este usuario
+        encuesta = Encuesta.objects.create(usuario=request.user)
+
+        # 2) Por cada pregunta, creamos una Respuesta ligada a esa encuesta
         for pregunta in Pregunta.objects.all():
             valor = request.POST.get(f'respuesta_{pregunta.id}')
             if valor in ['si', 'no']:
-                Respuesta.objects.update_or_create(
-                    usuario=request.user,
+                Respuesta.objects.create(
+                    encuesta=encuesta,
                     pregunta=pregunta,
-                    defaults={'valor': valor}
+                    valor=valor
                 )
-        messages.success(request, 'Respuestas guardadas con éxito.')
+
+        messages.success(request, 'Encuesta guardada con éxito.')
+        # Redirigimos a la selección de encuesta para poder verla
+        return redirect('seleccionar_encuesta')
+
+    # Si se accede por GET, redirigimos al formulario
     return redirect('formulario_gobernanza')
 
 @user_passes_test(es_usuario_anonimo, login_url='inicio')
@@ -144,85 +154,68 @@ def registro(request):
 # ------------------------------------------------------------------------------------------------------
 
 @login_required
-@user_passes_test(es_superusuario_activo)
-def mantenedor_respuestas(request, accion='listar', id=0):
-    """
-    CRUD para el mantenedor de respuestas:
-     - 'listar' (o cualquier otro valor): lista usuarios con al menos una respuesta
-     - 'ver': redirige a la vista de reporte de respuestas para ese usuario
-     - 'eliminar': borra todas las respuestas del usuario
-    """
-    usuario = get_object_or_404(User, pk=id) if int(id) > 0 else None
+def seleccionar_encuesta(request, user_id=None):
+    if user_id and request.user.is_superuser:
+        target = get_object_or_404(User, pk=user_id)
+    else:
+        target = request.user
 
-    # VER reporte
-    if accion == 'ver' and usuario:
-        # redirige a tu ruta 'respuestas' con el user_id
-        return redirect('respuestas', user_id=usuario.id)
+    # Ahora traemos las Encuesta en lugar de fechas desde Respuesta
+    surveys = Encuesta.objects.filter(usuario=target).order_by('-fecha')
 
-    # ELIMINAR todas sus respuestas
-    if accion == 'eliminar' and usuario:
-        Respuesta.objects.filter(usuario=usuario).delete()
-        messages.success(request, f'Todas las respuestas de "{usuario.username}" han sido eliminadas.')
-        return redirect('mantenedor_respuestas')
-
-    # LISTAR usuarios que tienen al menos una respuesta
-    users_con_respuestas = (
-        User.objects
-            .filter(respuesta__isnull=False)
-            .distinct()
-            .select_related('perfil')
-    )
-
-    return render(request, 'core/mantenedor_respuestas.html', {
-        'users': users_con_respuestas,
-        'accion': accion,
-        'usuario': usuario,
+    return render(request, 'core/seleccionar_encuesta.html', {
+        'target':  target,
+        'surveys': surveys,
     })
 
+
 @login_required
-def respuestas_view(request, user_id=None):
+def respuestas_view(request):
     """
-    Muestra el reporte de respuestas de un usuario.
-    Si eres superusuario y pasas user_id, muestra ese usuario; si no, tu propio reporte.
+    Muestra el reporte de una encuesta concreta, indicada por GET.encuesta_id.
+    Si no se recibe encuesta_id, redirige a seleccionar_encuesta.
+    Un superusuario puede ver cualquier encuesta; un usuario normal solo la suya.
     """
-    # --- Determinar sobre quién consulto ---
-    if user_id and request.user.is_superuser:
-        target_user = get_object_or_404(User, id=user_id)
-    else:
-        target_user = request.user
+    enc_id = request.GET.get('encuesta_id')
+    if not enc_id:
+        # no se indicó cuál, volvemos a la selección
+        return redirect('seleccionar_encuesta')
 
-    # --- Obtengo sus respuestas ---
-    respuestas = Respuesta.objects.filter(usuario=target_user)
+    # 1) Obtener la encuesta y verificar permisos
+    encuesta = get_object_or_404(Encuesta, id=enc_id)
+    if not request.user.is_superuser and encuesta.usuario != request.user:
+        messages.error(request, "No tienes permiso para ver esa encuesta.")
+        return redirect('seleccionar_encuesta')
 
-    # 1) Cálculo por dimensión
+    # 2) Cargar las respuestas de esa encuesta
+    qs = Respuesta.objects.filter(encuesta=encuesta).select_related('pregunta')
+
+    # 3) Cálculo por dimensión
     scores = defaultdict(lambda: {'si': 0, 'total': 0})
-    for r in respuestas:
+    for r in qs:
         dim = r.pregunta.dimension
         scores[dim]['total'] += 1
         if r.valor == 'si':
             scores[dim]['si'] += 1
 
-    # Raw y porcentaje por dimensión
+    # 4) Raw y porcentaje por dimensión
     dimension_scores = {}
     for dim, v in scores.items():
         si = v['si']
         total = v['total']
         pct = (si / total * 100) if total else 0
-        dimension_scores[dim] = {
-            'raw': si,
-            'pct': pct,
-        }
+        dimension_scores[dim] = {'raw': si, 'pct': pct}
 
-    # 2) Totales globales
-    total_raw    = sum(v['raw'] for v in dimension_scores.values())
+    # 5) Totales globales
+    total_raw    = sum(d['raw'] for d in dimension_scores.values())
     total_maxraw = sum(v['total'] for v in scores.values())
     total_pct    = (total_raw / total_maxraw * 100) if total_maxraw else 0
 
-    # 3) Puntaje ponderado (ejemplo fijado a 260)
+    # 6) Puntaje ponderado (fijo a 260 de ejemplo)
     max_weighted   = 260
     total_weighted = total_raw * (max_weighted / total_maxraw) if total_maxraw else 0
 
-    # 4) Nivel de madurez global
+    # 7) Nivel global
     if total_pct < 25:
         nivel_global = 'Insuficiente'
     elif total_pct < 50:
@@ -232,14 +225,15 @@ def respuestas_view(request, user_id=None):
     else:
         nivel_global = 'Avanzado'
 
-    # 5) Datos para el radar
+    # 8) Datos para el radar
     dim_labels = list(dimension_scores.keys())
     dim_user   = [round(d['pct'], 1) for d in dimension_scores.values()]
     dim_max    = [100] * len(dim_labels)
 
     return render(request, 'core/respuestas.html', {
-        'target_user':      target_user,
-        'respuestas':       respuestas,
+        'target_user':      encuesta.usuario,
+        'encuesta':         encuesta,
+        'respuestas':       qs,
         'dimension_scores': dimension_scores,
         'total_raw':        total_raw,
         'total_weighted':   total_weighted,
@@ -250,6 +244,57 @@ def respuestas_view(request, user_id=None):
         'dim_labels':       dim_labels,
         'dim_user':         dim_user,
         'dim_max':          dim_max,
+    })
+
+
+@login_required
+@user_passes_test(es_superusuario_activo)
+def mantenedor_respuestas(request, accion='listar', id=0):
+    """
+    CRUD para el mantenedor de respuestas:
+     - 'listar': lista usuarios con al menos una encuesta
+     - 'ver': redirige a respuestas_view pasando user_id y encuesta_id
+     - 'eliminar': borra todas las respuestas de un usuario
+    """
+    usuario = get_object_or_404(User, pk=id) if int(id) > 0 else None
+
+    # VER reporte para un usuario y encuesta concreta
+    if accion == 'ver' and usuario:
+        encuesta_id = request.GET.get('encuesta_id')
+        return redirect(f"{ reverse('respuestas') }?user_id={usuario.id}&encuesta_id={encuesta_id}")
+
+    # ELIMINAR todas sus respuestas
+    if accion == 'eliminar' and usuario:
+        Respuesta.objects.filter(encuesta__usuario=usuario).delete()
+        messages.success(request, f'Todas las respuestas de "{usuario.username}" han sido eliminadas.')
+        return redirect('mantenedor_respuestas')
+
+    # LISTAR usuarios que tienen al menos una encuesta
+    users_with_surveys = (
+        User.objects
+            .filter(encuesta__isnull=False)
+            .distinct()
+            .select_related('perfil')
+    )
+
+    user_data = []
+    for u in users_with_surveys:
+        # obtenemos todas las encuestas que haya hecho este usuario
+        encs = Encuesta.objects.filter(usuario=u).order_by('-fecha')
+        # armamos lista de dicts con id y fecha para cada encuesta
+        surveys = [
+            { 'id': e.id, 'date': e.fecha.date().isoformat() }
+            for e in encs
+        ]
+        user_data.append({
+            'user': u,
+            'surveys': surveys
+        })
+
+    return render(request, 'core/mantenedor_respuestas.html', {
+        'user_data': user_data,
+        'accion':    accion,
+        'usuario':   usuario,
     })
 
 # ------------------------------------------------------------------------------------------------------

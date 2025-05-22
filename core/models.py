@@ -29,15 +29,17 @@ class Perfil(models.Model):
 
     def get_dimension_score(self, dimension):
         """
-        Calcula el porcentaje de madurez (0–100) para una dimensión dada.
+        Calcula el porcentaje de madurez (0–100) para una dimensión dada,
+        tomando la última encuesta del usuario.
         """
-        from core.models import Respuesta, Pregunta
-        # Consultar respuestas del usuario para esta dimensión
+        from core.models import Respuesta, Pregunta, Encuesta
+        ultima = Encuesta.objects.filter(usuario=self.usuario).order_by('-fecha').first()
+        if not ultima:
+            return 0
         qs = Respuesta.objects.filter(
-            usuario=self.usuario,
+            encuesta=ultima,
             pregunta__dimension=dimension
         )
-        # Sumar puntajes: 'si' = 6, 'no' = 0
         total = qs.aggregate(
             total=Sum(
                 Case(
@@ -52,7 +54,7 @@ class Perfil(models.Model):
 
     def get_all_dimension_scores(self):
         """
-        Retorna un dict {dimension: porcentaje} para todas las dimensiones.
+        Retorna un dict {dimension: porcentaje} para la última encuesta.
         """
         from core.models import Pregunta
         dims = Pregunta.objects.values_list('dimension', flat=True).distinct()
@@ -60,15 +62,33 @@ class Perfil(models.Model):
 
     def get_global_score(self):
         """
-        Calcula el puntaje global (0–100) promediando todas las dimensiones.
+        Calcula el puntaje global (0–100) promediando todas las dimensiones
+        de la última encuesta.
         """
         scores = list(self.get_all_dimension_scores().values())
         return sum(scores) / len(scores) if scores else 0
 
+
+class Encuesta(models.Model):
+    """
+    Representa una ejecución de la encuesta por parte de un usuario.
+    Se genera una nueva instancia por cada envío del formulario.
+    """
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
+    fecha = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Encuesta'
+        verbose_name_plural = 'Encuestas'
+        ordering = ['-fecha']
+
+    def __str__(self):
+        return f'Encuesta #{self.id} - {self.usuario.username} ({self.fecha:%Y-%m-%d %H:%M})'
+
+
 class Pregunta(models.Model):
     # ID de negocio (no confundir con el pk de Django)
     codigo = models.IntegerField(unique=True, verbose_name='id de pregunta')
-
     dimension = models.CharField(max_length=100)
     criterio  = models.CharField(max_length=100)
     texto     = models.TextField()
@@ -84,20 +104,28 @@ class Pregunta(models.Model):
             'accion_editar': 'editar la pregunta'
         }
 
+
 class Respuesta(models.Model):
     VALORES = [
         ('si', 'Sí'),
         ('no', 'No'),
     ]
-    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
+    encuesta = models.ForeignKey(
+        Encuesta,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='respuestas'
+    )
     pregunta = models.ForeignKey(Pregunta, on_delete=models.CASCADE)
     valor = models.CharField(max_length=2, choices=VALORES)
-    fecha = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('usuario', 'pregunta')
+        unique_together = ('encuesta', 'pregunta')
         verbose_name = 'Respuesta'
         verbose_name_plural = 'Respuestas'
 
     def __str__(self):
-        return f"{self.usuario.username} - {self.pregunta.codigo}: {self.valor}"
+        user = self.encuesta.usuario.username if self.encuesta else 'N/A'
+        enc = f'Encuesta {self.encuesta.id}' if self.encuesta else ''
+        return f"{user} - {enc} - Pregunta {self.pregunta.codigo}: {self.valor}"

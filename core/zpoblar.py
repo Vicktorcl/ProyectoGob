@@ -1,7 +1,7 @@
-#!/usr/bin/env python
 # core/zpoblar.py
+#!/usr/bin/env python
 """
-Script para poblar las tablas Pregunta y Respuesta usando el campo 'codigo'.
+Script para poblar las tablas Pregunta, Encuesta y Respuesta usando el campo 'codigo'.
 Ejecuta desde la raíz del proyecto:
     python core/zpoblar.py
 """
@@ -9,7 +9,7 @@ import os
 import re
 import django
 from django.contrib.auth.models import User
-from core.models import Pregunta, Respuesta
+from core.models import Pregunta, Encuesta, Respuesta
 
 # Configurar Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ProyectoGob.settings')
@@ -75,7 +75,7 @@ PREGUNTAS_DATA = [
     { 'codigo': 46, 'dimension': 'Datos abiertos',                       'criterio': 'Publicación',                        'texto': '46.- ¿Se publican datos abiertos de manera regular?' },
     { 'codigo': 47, 'dimension': 'Datos abiertos',                       'criterio': 'Publicación',                        'texto': '47.- ¿Si se publican datos abiertos en qué lugar se publican?' },
     { 'codigo': 48, 'dimension': 'Datos abiertos',                       'criterio': 'Publicación',                        'texto': '48.- ¿Existen las condiciones (recursos) e incentivos para la publicación de datos abiertos?' },
-    { 'codigo': 49, 'dimension': 'Datos abiertos',                       'criterio': 'Publicación',                        'texto': '49.- ¿Se incentiva la publicación de datasets de alta contribución según lo que estipula la normativa de datos abiertos y estrategia nacional de datos abiertos?' },
+    { 'codigo': 49, 'dimension': 'Datos abiertos',                       'criterio': 'Publicación',                        'texto': '49.- ¿Se incentiva la publicación de datasets de alta contribución según lo estipula la normativa de datos abiertos y estrategia nacional de datos abiertos?' },
     { 'codigo': 50, 'dimension': 'Datos abiertos',                       'criterio': 'Mecanismos de acceso, formato, documentación y condiciones de uso', 'texto': '50.- ¿Con qué mecanismos de acceso, formato, documentación y condiciones de uso se publican los datos abiertos?' },
 
     { 'codigo': 51, 'dimension': 'Aspectos legales y normativos',        'criterio': 'Participación del área jurídica',   'texto': '51.- ¿Existe participación del área jurídica en la definición y validación de políticas y procedimientos de gobierno de datos para asegurar cumplimiento de las leyes y normativas?' },
@@ -89,12 +89,11 @@ def eliminar_tablas():
     print('> Eliminando preguntas existentes...')
     Pregunta.objects.all().delete()
 
-
 def crear_preguntas():
     creadas = 0
     for entry in PREGUNTAS_DATA:
         # Limpiar prefijo numérico
-        texto = re.sub(r'^\d+\.\-\s*', '', entry['texto'])
+        texto = re.sub(r'^\d+\.-\s*', '', entry['texto'])
         pregunta, created = Pregunta.objects.update_or_create(
             codigo=entry['codigo'],
             defaults={
@@ -108,24 +107,24 @@ def crear_preguntas():
             print(f"  [CREADA] código={pregunta.codigo} | {pregunta.dimension} | {pregunta.criterio}")
     print(f"> Total de preguntas creadas: {creadas}")
 
-
 def asignar_respuestas(username='super123', valor='si'):
     try:
         usuario = User.objects.get(username=username)
     except User.DoesNotExist:
         print(f"ERROR: Usuario '{username}' no existe.")
         return
+    # Crear nueva encuesta para este usuario
+    encuesta = Encuesta.objects.create(usuario=usuario)
     asignadas = 0
     for pregunta in Pregunta.objects.all():
         _, created = Respuesta.objects.get_or_create(
-            usuario=usuario,
+            encuesta=encuesta,
             pregunta=pregunta,
             defaults={'valor': valor}
         )
         if created:
             asignadas += 1
-    print(f"> Respuestas '{valor}' asignadas a '{username}': {asignadas}")
-
+    print(f"> Respuestas '{valor}' asignadas a '{username}' en encuesta {encuesta.id}: {asignadas}")
 
 def poblar_bd():
     print('Iniciando poblamiento de Pregunta y Respuesta...')
@@ -133,7 +132,6 @@ def poblar_bd():
     crear_preguntas()
     asignar_respuestas()
     print('Proceso de poblamiento completado.')
-
 
 if __name__ == '__main__':
     poblar_bd()

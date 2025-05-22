@@ -1,0 +1,23 @@
+{# templates/core/seleccionar_encuesta.html #}
+{% extends 'core/base.html' %}
+{% block title %}Seleccionar Encuesta{% endblock title %}
+
+{% block content %}
+<div class="container my-5">
+  <h2 class="mb-4 text-center">Historial de Encuestas de {{ target.username }}</h2>
+  <ul class="list-group">
+    {% for enc in surveys %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <!-- Mostrar fecha y hora completas -->
+        {{ enc.fecha|date:"Y-m-d H:i" }}
+        <a href="{% url 'respuestas' %}?user_id={{ target.id }}&encuesta_id={{ enc.id }}"
+           class="btn btn-sm btn-primary">
+          Ver respuestas
+        </a>
+      </li>
+    {% empty %}
+      <li class="list-group-item">No hay encuestas previas.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

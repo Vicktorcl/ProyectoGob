@@ -1,29 +1,60 @@
+{# templates/core/mantenedor_respuestas.html #}
 {% extends 'core/base.html' %}
-{% block title %}Mantenedor de Respuestas{% endblock title %}
+{% block title %}Mantenedor de Respuestas{% endblock %}
+
 {% block content %}
 <div class="container my-5">
   <h2 class="mb-4 text-center">Mantenedor de Respuestas</h2>
-  <table class="table table-hover">
-    <thead>
+  <table class="table table-hover align-middle">
+    <thead class="table-light">
       <tr>
-        <th>ID</th><th>Usuario</th><th>Empresa</th><th>Acción</th>
+        <th>ID</th>
+        <th>Usuario</th>
+        <th>Empresa</th>
+        <th>Encuestas realizadas</th>
+        <th>Acciones</th>
       </tr>
     </thead>
     <tbody>
-      {% for user in users %}
-      <tr>
-        <td>{{ user.id }}</td>
-        <td>{{ user.username }}</td>
-        <td>{{ user.perfil.nombre_empresa }}</td>
-        <td>
-          <a href="{% url 'respuestas_usuario' user.id %}"
-             class="btn btn-sm btn-primary">
-            Ver Respuestas
-          </a>
-        </td>
-      </tr>
+      {% for entry in user_data %}
+        {% with u=entry.user surveys=entry.surveys %}
+        <tr>
+          <td>{{ u.id }}</td>
+          <td>{{ u.username }}</td>
+          <td>{{ u.perfil.nombre_empresa }}</td>
+          <td>
+            <div class="dropdown">
+              <button class="btn btn-sm btn-secondary dropdown-toggle" type="button"
+                      id="drop{{ u.id }}" data-bs-toggle="dropdown" aria-expanded="false">
+                {{ surveys|length }} encuesta{{ surveys|length|pluralize }}
+              </button>
+              <ul class="dropdown-menu" aria-labelledby="drop{{ u.id }}">
+                {% for s in surveys %}
+                  <li>
+                    <a class="dropdown-item"
+                       href="{% url 'respuestas' %}?user_id={{ u.id }}&encuesta_id={{ s.id }}">
+                      {{ s.date }}
+                    </a>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          </td>
+          <td>
+            <a href="{% url 'mantenedor_respuestas' 'eliminar' u.id %}"
+               class="btn btn-sm btn-danger"
+               onclick="return confirm('¿Eliminar todas las respuestas de {{ u.username }}?');">
+              Eliminar todas
+            </a>
+          </td>
+        </tr>
+        {% endwith %}
+      {% empty %}
+        <tr>
+          <td colspan="5" class="text-center">No hay usuarios con encuestas.</td>
+        </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
-{% endblock content %}
+{% endblock %}
