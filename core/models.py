@@ -74,9 +74,7 @@ class Encuesta(models.Model):
     Representa una ejecución de la encuesta por parte de un usuario.
     Se genera una nueva instancia por cada envío del formulario.
     """
-    usuario = models.ForeignKey(User, on_delete=models.SET_NULL,
-        null=True,
-        blank=True)
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
     fecha = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -131,3 +129,51 @@ class Respuesta(models.Model):
         user = self.encuesta.usuario.username if self.encuesta else 'N/A'
         enc = f'Encuesta {self.encuesta.id}' if self.encuesta else ''
         return f"{user} - {enc} - Pregunta {self.pregunta.codigo}: {self.valor}"
+        
+
+class PreguntaGD(models.Model):
+    NIVEL_CHOICES = [
+        ('inicial','Inicial'), ('gestionado','Gestionado'),
+        ('definido','Definido'), ('medido','Medido'),
+        ('optimo','Óptimo'),
+    ]
+    codigo       = models.CharField(max_length=10, unique=True)
+    grupo        = models.CharField(max_length=50)
+    categoria    = models.CharField(max_length=50)
+    area         = models.CharField(max_length=20, help_text="Ej. AP2.3.1")
+    numero       = models.PositiveIntegerField(help_text="Número de afirmación en el área")
+    texto        = models.TextField()
+    peso_area    = models.DecimalField(max_digits=5, decimal_places=2,
+                                       help_text="Peso del área (suma 100 por categoría)")
+    nivel        = models.CharField(max_length=20, choices=NIVEL_CHOICES)
+
+    class Meta:
+        verbose_name = 'Pregunta GD'
+        verbose_name_plural = 'Preguntas GD'
+        ordering = ['grupo','categoria','area','numero']
+
+class EncuestaGD(models.Model):
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
+    fecha   = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = 'Encuesta GD'
+        verbose_name_plural = 'Encuestas GD'
+        ordering = ['-fecha']
+
+    def __str__(self):
+        return f'EncuestaGD #{self.id} – {self.usuario.username} ({self.fecha:%Y-%m-%d})'
+
+class RespuestaGD(models.Model):
+    VALORACION = [
+        (1, 'No cumple'), (2, 'Consciente'),
+        (3, 'Implantando'), (4, 'Operativo'),
+    ]
+    encuesta     = models.ForeignKey(EncuestaGD, on_delete=models.CASCADE, related_name='respuestas')
+    pregunta     = models.ForeignKey(PreguntaGD, on_delete=models.CASCADE)
+    valoracion   = models.PositiveSmallIntegerField(choices=VALORACION)
+
+    class Meta:
+        unique_together = ('encuesta','pregunta')
+        verbose_name = 'Respuesta GD'
+        verbose_name_plural = 'Respuestas GD'

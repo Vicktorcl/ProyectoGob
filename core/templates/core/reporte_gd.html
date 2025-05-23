@@ -1,0 +1,109 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Reporte GD — Encuesta #{{ encuesta.id }}{% endblock title %}
+
+{% block content %}
+<div class="container my-5">
+  <h2 class="mb-4 text-center">
+    Reporte GD de {{ encuesta.usuario.username }} — {{ encuesta.fecha|date:"Y-m-d H:i" }}
+  </h2>
+
+  <div class="row">
+    <!-- Columna del radar -->
+    <div class="col-md-6">
+      <canvas id="radarChartGD" height="350"></canvas>
+    </div>
+
+    <!-- Columna del detalle por Grupo -->
+    <div class="col-md-6">
+      <h4 class="mb-3">Detalle por Área de Proceso</h4>
+      <div class="accordion" id="accordionGrupo">
+        {% for grupo in groups %}
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+            <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#collapse{{ forloop.counter }}"
+                    aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
+                    aria-controls="collapse{{ forloop.counter }}">
+              Grupo {{ grupo }}
+            </button>
+          </h2>
+          <div id="collapse{{ forloop.counter }}"
+               class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+               aria-labelledby="heading{{ forloop.counter }}"
+               data-bs-parent="#accordionGrupo">
+            <div class="accordion-body p-0">
+              <table class="table table-bordered table-sm mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Categoría</th>
+                    <th>Área de Proceso</th>
+                    <th>Nivel</th>
+                    <th>Peso</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for r in respuestas %}
+                    {% if r.pregunta.grupo == grupo %}
+                    <tr>
+                      <td>{{ r.pregunta.categoria }}</td>
+                      <td>
+                        {{ r.pregunta.area }}<br>
+                        <small class="text-muted">{{ r.pregunta.texto|truncatechars:50 }}</small>
+                      </td>
+                      <td>{{ r.valoracion }}</td>
+                      <td>{{ r.pregunta.peso_area }}</td>
+                    </tr>
+                    {% endif %}
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block script %}
+  {{ radar_labels|json_script:"gdLabels" }}
+  {{ radar_user_data|json_script:"gdValues" }}
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+  <script>
+    // Radar Chart
+    const labels = JSON.parse(document.getElementById('gdLabels').textContent);
+    const values = JSON.parse(document.getElementById('gdValues').textContent);
+    new Chart(document.getElementById('radarChartGD'), {
+      type: 'radar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Porcentaje GD',
+          data: values,
+          fill: true,
+          backgroundColor: 'rgba(54,162,235,0.2)',
+          borderColor: 'rgb(54,162,235)',
+          pointBackgroundColor: 'rgb(54,162,235)'
+        }]
+      },
+      options: {
+        scales: {
+          r: {
+            beginAtZero: true,
+            max: 100,
+            ticks: { callback: v => v + '%' }
+          }
+        },
+        plugins: { legend: { position: 'top' } }
+      }
+    });
+  </script>
+{% endblock script %}
+

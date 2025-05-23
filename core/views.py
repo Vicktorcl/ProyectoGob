@@ -11,16 +11,16 @@ from django.core.mail import send_mail
 from django.urls import reverse
 from django.db.models.functions import TruncDate
 from collections import defaultdict
-from .models import Perfil, Pregunta, Respuesta, Encuesta
+from .models import Perfil, Pregunta, Respuesta, Encuesta, EncuestaGD, PreguntaGD, RespuestaGD
 from .forms import (
     GobernanzaForm, PreguntaForm, 
     IngresarForm, UsuarioForm, PerfilForm,
-    RegistroUsuarioForm, RegistroPerfilForm
+    RegistroUsuarioForm, RegistroPerfilForm, EncuestaGDForm
 )
 from .tools import eliminar_registro, show_form_errors
 # Importar función de poblamiento
 from core.zpoblar import poblar_bd
-
+from core.zpoblar2 import poblar_gd
 # ------------------------------------------------------------------------------------------------------
 # Funciones auxiliares para autorización
 # ------------------------------------------------------------------------------------------------------
@@ -442,3 +442,120 @@ def poblar_bd_view(request):
 
 def nosotros(request):
     return render(request, 'core/nosotros.html')
+
+@login_required
+def seleccionar_encuesta_gd(request, user_id=None):
+    if user_id and es_superusuario_activo(request.user):
+        target = get_object_or_404(request.user.__class__, pk=user_id)
+    else:
+        target = request.user
+
+    # traer todas las encuestas GD de ese usuario
+    encuestas = (
+        EncuestaGD.objects
+                 .filter(usuario=target)
+                 .order_by('-fecha')
+    )
+    return render(request, 'core/seleccionar_encuesta_gd.html', {
+        'target':   target,
+        'encuestas': encuestas,
+    })
+
+# 2) Creación de una nueva encuesta GD
+@login_required
+def nueva_encuesta_gd(request):
+    # Ordena por grupo y categoría para mostrarlas agrupadas en el template
+    preguntas = PreguntaGD.objects.all().order_by('grupo', 'categoria', 'area', 'numero')
+
+    if request.method == 'POST':
+        # Creas la nueva encuesta
+        encuesta = EncuestaGD.objects.create(usuario=request.user)
+        # Iteras sobre cada pregunta y guardas la respuesta
+        for pregunta in preguntas:
+            valor = request.POST.get(f'p_{pregunta.id}')
+            if valor:
+                RespuestaGD.objects.create(
+                    encuesta=encuesta,
+                    pregunta=pregunta,
+                    valoracion=int(valor)
+                )
+        return redirect('reporte_gd', encuesta_id=encuesta.id)
+
+    # Para el GET, agrupamos en un dict por grupo→categoría
+    preguntas_agrupadas = {}
+    for pq in preguntas:
+        preguntas_agrupadas\
+            .setdefault(pq.grupo, {})\
+            .setdefault(pq.categoria, [])\
+            .append(pq)
+
+    return render(request, 'core/nueva_encuesta_gd.html', {
+        'preguntas_agrupadas': preguntas_agrupadas,
+    })
+    
+
+@login_required
+@user_passes_test(es_superusuario_activo)
+def zpoblar2_view(request):
+    """
+    Ejecuta zpoblar_gd.poblar_gd() para poblar las preguntas GD
+    y redirige con un mensaje de éxito.
+    """
+    poblar_gd()
+    messages.success(request, "Preguntas GD pobladas correctamente.")
+    return redirect('nueva_encuesta_gd')
+
+@login_required
+def reporte_gd(request, encuesta_id):
+    encuesta = get_object_or_404(EncuestaGD, pk=encuesta_id)
+    # Sólo su autor o el superusuario
+    if encuesta.usuario != request.user and not es_superusuario_activo(request.user):
+        return redirect('seleccionar_encuesta_gd')
+
+    # 1) Traer todas las respuestas de esa encuesta
+    respuestas = RespuestaGD.objects.filter(encuesta=encuesta).select_related('pregunta')
+
+    # 2) Extraer grupos únicos para el dropdown/accordion
+    groups = sorted({ r.pregunta.grupo for r in respuestas })
+
+    # 3) Cálculo por “dimensión” = grupo
+    scores = defaultdict(lambda: {'acum': 0.0, 'peso_total': 0.0})
+    for r in respuestas:
+        grp     = r.pregunta.grupo
+        peso    = float(r.pregunta.peso_area)
+        scores[grp]['acum']       += peso
+        scores[grp]['peso_total'] += peso
+
+    dimension_scores = {}
+    for grp, v in scores.items():
+        acum      = v['acum']
+        peso_tot  = v['peso_total']
+        pct       = (acum / peso_tot * 100) if peso_tot else 0
+        dimension_scores[grp] = {
+            'score':     acum,
+            'max_score': peso_tot,
+            'pct':       pct,
+        }
+
+    # 4) Totales globales
+    total_score     = sum(d['score']     for d in dimension_scores.values())
+    total_max_score = sum(d['max_score'] for d in dimension_scores.values())
+    total_pct       = (total_score / total_max_score * 100) if total_max_score else 0
+
+    # 5) Datos para radar chart
+    radar_labels    = list(dimension_scores.keys())
+    radar_user_data = [round(d['pct'], 1) for d in dimension_scores.values()]
+    radar_max_data  = [100] * len(radar_labels)
+
+    return render(request, 'core/reporte_gd.html', {
+        'encuesta':          encuesta,
+        'respuestas':        respuestas,
+        'groups':            groups,
+        'dimension_scores':  dimension_scores,
+        'total_score':       total_score,
+        'total_max_score':   total_max_score,
+        'total_pct':         total_pct,
+        'radar_labels':      radar_labels,
+        'radar_user_data':   radar_user_data,
+        'radar_max_data':    radar_max_data,
+    })
