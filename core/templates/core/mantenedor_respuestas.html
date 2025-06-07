@@ -30,17 +30,28 @@
               </button>
               <ul class="dropdown-menu" aria-labelledby="drop{{ u.id }}">
                 {% for s in surveys %}
-                  <li>
-                    <a class="dropdown-item"
-                       href="{% url 'respuestas' %}?user_id={{ u.id }}&encuesta_id={{ s.id }}">
-                      {{ s.date }}
-                    </a>
+                  <li class="d-flex justify-content-between align-items-center px-2">
+                    <span>{{ s.date }}</span>
+                    <div>
+                      {# Ver reporte de esa encuesta #}
+                      <a class="btn btn-sm btn-outline-primary me-1"
+                         href="{% url 'respuestas' %}?user_id={{ u.id }}&encuesta_id={{ s.id }}">
+                        Ver
+                      </a>
+                      {# Eliminar solo esa encuesta #}
+                      <a class="btn btn-sm btn-outline-danger"
+                         href="{% url 'mantenedor_respuestas' 'eliminar_encuesta' u.id %}?encuesta_id={{ s.id }}"
+                         onclick="return confirm('¿Eliminar la encuesta del {{ s.date }} de {{ u.username }}?');">
+                        Eliminar
+                      </a>
+                    </div>
                   </li>
                 {% endfor %}
               </ul>
             </div>
           </td>
           <td>
+            {# Botón para eliminar todas las respuestas de este usuario #}
             <a href="{% url 'mantenedor_respuestas' 'eliminar' u.id %}"
                class="btn btn-sm btn-danger"
                onclick="return confirm('¿Eliminar todas las respuestas de {{ u.username }}?');">
@@ -57,4 +68,4 @@
     </tbody>
   </table>
 </div>
-{% endblock %}
+{% endblock content %}

@@ -1,29 +1,40 @@
 from datetime import date
-from django.http import JsonResponse
+from django.contrib.auth.models import User 
+from collections import defaultdict
+from django.db.models import Count, Max
+from django.db.models.functions import TruncDate
+from django.forms import inlineformset_factory
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth import login, logout, authenticate
-from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import PasswordChangeForm
 from django.urls import reverse
-from django.core.mail import send_mail
-from django.urls import reverse
-from django.db.models.functions import TruncDate
-from collections import defaultdict
-from .models import Perfil, Pregunta, Respuesta, Encuesta, EncuestaGD, PreguntaGD, RespuestaGD
+
+from .models import (
+    Perfil, Pregunta, OpcionPregunta,
+    Respuesta, Encuesta,
+    EncuestaGD, PreguntaGD, RespuestaGD
+)
 from .forms import (
-    GobernanzaForm, PreguntaForm, 
+    GobernanzaForm, PreguntaForm,
     IngresarForm, UsuarioForm, PerfilForm,
-    RegistroUsuarioForm, RegistroPerfilForm, EncuestaGDForm
+    RegistroUsuarioForm, RegistroPerfilForm,
+    EncuestaGDForm
 )
 from .tools import eliminar_registro, show_form_errors
-# Importar función de poblamiento
 from core.zpoblar import poblar_bd
 from core.zpoblar2 import poblar_gd
 # ------------------------------------------------------------------------------------------------------
 # Funciones auxiliares para autorización
 # ------------------------------------------------------------------------------------------------------
+
+# Inline formset para opciones de Pregunta clásica
+OpcionFormSet = inlineformset_factory(
+    Pregunta, OpcionPregunta,
+    fields=('texto', 'puntaje', 'orden'),
+    extra=1, can_delete=True
+)
 
 def es_superusuario_activo(user):
     return user.is_superuser and user.is_authenticated and user.is_active
@@ -57,51 +68,89 @@ def inicio(request):
 
     return render(request, 'core/inicio.html', {'form': form})
 
+
 @login_required
 def formulario_gobernanza(request):
-    preguntas = Pregunta.objects.all()
+    """
+    GET: muestra las preguntas con todas sus opciones.
+    POST: guarda todas las respuestas del usuario en una nueva Encuesta.
+    """
+
+    # --- 1) Cargar todas las preguntas ordenadas ---
+    preguntas = Pregunta.objects.all().order_by('dimension', 'codigo')
+
+    # --- 2) Traer todas las opciones y agruparlas en un dict { pregunta_pk: [OpcionPregunta, ...] } ---
+    todas_opciones = OpcionPregunta.objects.all().order_by('pregunta_id', 'orden')
+    opciones_por_pregunta = defaultdict(list)
+    for opcion in todas_opciones:
+        opciones_por_pregunta[opcion.pregunta_id].append(opcion)
+
+    # --- 3) Asignar a cada pregunta un atributo "lista_opciones" (no tocar 'pregunta.opciones') ---
+    for pregunta in preguntas:
+        pregunta.lista_opciones = opciones_por_pregunta.get(pregunta.pk, [])
+
+    # --- 4) Si llega un POST, procesamos las respuestas ---
     if request.method == 'POST':
-        form = GobernanzaForm(request.POST, preguntas=preguntas)
-        if form.is_valid():
-            for pregunta in preguntas:
-                valor = form.cleaned_data[f'respuesta_{pregunta.id}']
-                Respuesta.objects.update_or_create(
-                    usuario=request.user,
+        usuario = request.user
+        encuesta = Encuesta.objects.create(usuario=usuario)
+
+        for pregunta in preguntas:
+            nombre_campo = f"respuesta_{pregunta.pk}"
+            valor = request.POST.get(nombre_campo)
+            if not valor:
+                continue
+
+            # Si la pregunta tiene opciones en nuestra lista dinámica
+            if pregunta.lista_opciones:
+                try:
+                    opcion_obj = get_object_or_404(OpcionPregunta, pk=int(valor), pregunta=pregunta)
+                except ValueError:
+                    continue
+                Respuesta.objects.create(
+                    encuesta=encuesta,
                     pregunta=pregunta,
-                    defaults={'valor': valor}
+                    opcion=opcion_obj
                 )
-            messages.success(request, 'Respuestas guardadas con éxito.')
-            return redirect('formulario_gobernanza')
-    else:
-        form = GobernanzaForm(preguntas=preguntas)
-
-    return render(request, 'core/gobernanza.html', {
-        'form': form,
-        'preguntas': preguntas,
-    })
-
-@login_required
-def guardar_gobernanza(request):
-    """Procesa y guarda las respuestas como una nueva Encuesta."""
-    if request.method == 'POST':
-        # 1) Creamos una nueva encuesta para este usuario
-        encuesta = Encuesta.objects.create(usuario=request.user)
-
-        # 2) Por cada pregunta, creamos una Respuesta ligada a esa encuesta
-        for pregunta in Pregunta.objects.all():
-            valor = request.POST.get(f'respuesta_{pregunta.id}')
-            if valor in ['si', 'no']:
+            else:
+                # Pregunta sin opciones definidas → valor esperado "si" o "no"
                 Respuesta.objects.create(
                     encuesta=encuesta,
                     pregunta=pregunta,
                     valor=valor
                 )
 
-        messages.success(request, 'Encuesta guardada con éxito.')
-        # Redirigimos a la selección de encuesta para poder verla
-        return redirect('seleccionar_encuesta')
+        messages.success(request, "Respuestas guardadas con éxito.")
+        return redirect('formulario_gobernanza')
 
-    # Si se accede por GET, redirigimos al formulario
+    # --- 5) GET: renderizamos plantilla pasando 'preguntas', cada una con 'lista_opciones' ---
+    return render(request, 'core/gobernanza.html', {
+        'preguntas': preguntas
+    })
+
+@login_required
+def guardar_gobernanza(request):
+    if request.method == 'POST':
+        encuesta = Encuesta.objects.create(usuario=request.user)
+        preguntas = Pregunta.objects.all()
+        for pregunta in preguntas:
+            val = request.POST.get(f'respuesta_{pregunta.pk}')
+            if pregunta.opciones.exists():
+                # valor es el PK de OpcionPregunta
+                option = get_object_or_404(OpcionPregunta, pk=val)
+                Respuesta.objects.create(
+                    encuesta=encuesta,
+                    pregunta=pregunta,
+                    opcion=option
+                )
+            else:
+                # las clásicas sí/no
+                Respuesta.objects.create(
+                    encuesta=encuesta,
+                    pregunta=pregunta,
+                    valor=val
+                )
+        messages.success(request, 'Encuesta guardada con éxito.')
+        return redirect('seleccionar_encuesta')
     return redirect('formulario_gobernanza')
 
 @user_passes_test(es_usuario_anonimo, login_url='inicio')
@@ -172,13 +221,17 @@ def seleccionar_encuesta(request, user_id=None):
 @login_required
 def respuestas_view(request):
     """
-    Muestra el reporte de una encuesta concreta, indicada por GET.encuesta_id.
-    Si no se recibe encuesta_id, redirige a seleccionar_encuesta.
-    Un superusuario puede ver cualquier encuesta; un usuario normal solo la suya.
+    Muestra el reporte de una encuesta concreta (GET.encuesta_id). Si no hay encuesta_id,
+    redirige a seleccionar_encuesta. El puntaje de cada respuesta proviene de
+    OpcionPregunta.puntaje (o, en preguntas clásicas Sí/No, 6 para 'si' y 0 para 'no').
+    El puntaje máximo se calcula sólo sobre las preguntas RESPONDIDAS en esta encuesta:
+    - Por dimensión, máximo = (# preguntas respondidas en esa dimensión) × 6
+    - Global, máximo = suma de todos esos máximos (equivalente a total preguntas respondidas × 6)
+    Esto evita que se contabilicen preguntas de otras encuestas y corrige el valor de 1872.
     """
+
     enc_id = request.GET.get('encuesta_id')
     if not enc_id:
-        # no se indicó cuál, volvemos a la selección
         return redirect('seleccionar_encuesta')
 
     # 1) Obtener la encuesta y verificar permisos
@@ -187,35 +240,64 @@ def respuestas_view(request):
         messages.error(request, "No tienes permiso para ver esa encuesta.")
         return redirect('seleccionar_encuesta')
 
-    # 2) Cargar las respuestas de esa encuesta
-    qs = Respuesta.objects.filter(encuesta=encuesta).select_related('pregunta')
+    # 2) Puntaje fijo POR PREGUNTA (para preguntas clásicas): 6
+    PTS_PREGUNTA = 6.0
 
-    # 3) Cálculo por dimensión
-    scores = defaultdict(lambda: {'si': 0, 'total': 0})
-    for r in qs:
-        dim = r.pregunta.dimension
-        scores[dim]['total'] += 1
-        if r.valor == 'si':
-            scores[dim]['si'] += 1
+    # 3) Cargar las respuestas de ESTA encuesta
+    #    Seleccionamos pregunta y opción para cada Respuesta
+    respuestas_qs = (
+        Respuesta.objects
+                 .filter(encuesta=encuesta)
+                 .select_related('pregunta', 'opcion')
+    )
 
-    # 4) Raw y porcentaje por dimensión
+    # 4) Agrupar las preguntas RESPONDIDAS por dimensión
+    #    Usaremos esto para saber cuántas preguntas se respondieron en cada dimensión
+    preguntas_respondidas_por_dim = defaultdict(set)
+    #    Y al mismo tiempo iremos sumando el puntaje que obtuvo el usuario
+    puntaje_usuario_por_dim = defaultdict(float)
+
+    for respuesta in respuestas_qs:
+        pregunta = respuesta.pregunta
+        dim = pregunta.dimension
+        pid = pregunta.pk
+
+        # 4.1) Agregamos a ese conjunto el ID de la pregunta (para contar más tarde)
+        preguntas_respondidas_por_dim[dim].add(pid)
+
+        # 4.2) Calcular el puntaje obtenido en esta respuesta:
+        if respuesta.opcion_id:
+            # Viene de OpcionPregunta → usamos su puntaje real
+            puntaje_usuario_por_dim[dim] += float(respuesta.opcion.puntaje)
+        else:
+            # Pregunta clásica Sí/No: “si” → 6 puntos, “no” → 0
+            puntaje_usuario_por_dim[dim] += (PTS_PREGUNTA if respuesta.valor == 'si' else 0.0)
+
+    # 5) Construir la estructura dimension_scores
     dimension_scores = {}
-    for dim, v in scores.items():
-        si = v['si']
-        total = v['total']
-        pct = (si / total * 100) if total else 0
-        dimension_scores[dim] = {'raw': si, 'pct': pct}
+    for dim, preguntas_set in preguntas_respondidas_por_dim.items():
+        user_sum = puntaje_usuario_por_dim[dim]
+        count_q = len(preguntas_set)               # número de preguntas respondidas en esta dimensión
+        max_sum = count_q * PTS_PREGUNTA           # máximo posible en esa dimensión
 
-    # 5) Totales globales
-    total_raw    = sum(d['raw'] for d in dimension_scores.values())
-    total_maxraw = sum(v['total'] for v in scores.values())
-    total_pct    = (total_raw / total_maxraw * 100) if total_maxraw else 0
+        pct = (user_sum / max_sum * 100) if max_sum else 0.0
+        dimension_scores[dim] = {
+            'user_sum': round(user_sum, 1),
+            'max_sum':  round(max_sum, 1),
+            'pct':      round(pct, 1),
+            'count_q':  count_q
+        }
 
-    # 6) Puntaje ponderado (fijo a 260 de ejemplo)
-    max_weighted   = 260
-    total_weighted = total_raw * (max_weighted / total_maxraw) if total_maxraw else 0
+    # 6) Totales globales
+    total_user   = sum(v['user_sum'] for v in dimension_scores.values())
+    total_maxraw = sum(v['max_sum']  for v in dimension_scores.values())
+    total_pct    = (total_user / total_maxraw * 100) if total_maxraw else 0.0
 
-    # 7) Nivel global
+    # 7) Puntaje ponderado (ejemplo: escala fija a 260 puntos totales)
+    max_weighted   = 260.0
+    total_weighted = total_user * (max_weighted / total_maxraw) if total_maxraw else 0.0
+
+    # 8) Nivel global según porcentaje
     if total_pct < 25:
         nivel_global = 'Insuficiente'
     elif total_pct < 50:
@@ -225,48 +307,63 @@ def respuestas_view(request):
     else:
         nivel_global = 'Avanzado'
 
-    # 8) Datos para el radar
+    # 9) Datos para gráfico radar
     dim_labels = list(dimension_scores.keys())
-    dim_user   = [round(d['pct'], 1) for d in dimension_scores.values()]
-    dim_max    = [100] * len(dim_labels)
+    dim_user   = [dimension_scores[d]['pct'] for d in dim_labels]
+    dim_max    = [100.0] * len(dim_labels)
 
     return render(request, 'core/respuestas.html', {
         'target_user':      encuesta.usuario,
         'encuesta':         encuesta,
-        'respuestas':       qs,
+        'respuestas':       respuestas_qs,
         'dimension_scores': dimension_scores,
-        'total_raw':        total_raw,
-        'total_weighted':   total_weighted,
-        'total_pct':        total_pct,
+        'total_user':       round(total_user, 1),
+        'total_weighted':   round(total_weighted, 1),
+        'total_pct':        round(total_pct, 1),
         'nivel_global':     nivel_global,
-        'total_maxraw':     total_maxraw,
+        'total_maxraw':     round(total_maxraw, 1),
         'max_weighted':     max_weighted,
         'dim_labels':       dim_labels,
         'dim_user':         dim_user,
         'dim_max':          dim_max,
     })
 
-
 @login_required
 @user_passes_test(es_superusuario_activo)
 def mantenedor_respuestas(request, accion='listar', id=0):
     """
     CRUD para el mantenedor de respuestas:
-     - 'listar': lista usuarios con al menos una encuesta
-     - 'ver': redirige a respuestas_view pasando user_id y encuesta_id
+     - 'listar': muestra usuarios que tienen encuestas
      - 'eliminar': borra todas las respuestas de un usuario
+     - 'eliminar_encuesta': borra una sola encuesta y sus respuestas
+     - 'ver': redirige a respuestas_view con user_id y encuesta_id
     """
     usuario = get_object_or_404(User, pk=id) if int(id) > 0 else None
 
-    # VER reporte para un usuario y encuesta concreta
+    # Si la acción es 'ver' (opcional: podríamos eliminarlo si ya no lo usamos aquí)
     if accion == 'ver' and usuario:
         encuesta_id = request.GET.get('encuesta_id')
         return redirect(f"{ reverse('respuestas') }?user_id={usuario.id}&encuesta_id={encuesta_id}")
 
-    # ELIMINAR todas sus respuestas
+    # ELIMINAR TODAS las respuestas de un usuario
     if accion == 'eliminar' and usuario:
         Respuesta.objects.filter(encuesta__usuario=usuario).delete()
+        Encuesta.objects.filter(usuario=usuario).delete()
         messages.success(request, f'Todas las respuestas de "{usuario.username}" han sido eliminadas.')
+        return redirect('mantenedor_respuestas')
+
+    # ELIMINAR una sola encuesta (y sus respuestas)
+    if accion == 'eliminar_encuesta' and usuario:
+        # Tomamos encuesta_id de GET
+        encuesta_id = request.GET.get('encuesta_id')
+        if encuesta_id:
+            encuesta = get_object_or_404(Encuesta, pk=encuesta_id, usuario=usuario)
+            # Borra todas las respuestas de esa encuesta, luego la encuesta
+            Respuesta.objects.filter(encuesta=encuesta).delete()
+            encuesta.delete()
+            messages.success(request, f'Encuesta {encuesta_id} de "{usuario.username}" eliminada correctamente.')
+        else:
+            messages.error(request, "No se especificó encuesta para eliminar.")
         return redirect('mantenedor_respuestas')
 
     # LISTAR usuarios que tienen al menos una encuesta
@@ -279,15 +376,13 @@ def mantenedor_respuestas(request, accion='listar', id=0):
 
     user_data = []
     for u in users_with_surveys:
-        # obtenemos todas las encuestas que haya hecho este usuario
         encs = Encuesta.objects.filter(usuario=u).order_by('-fecha')
-        # armamos lista de dicts con id y fecha para cada encuesta
         surveys = [
-            { 'id': e.id, 'date': e.fecha.date().isoformat() }
+            {'id': e.id, 'date': e.fecha.date().isoformat()}
             for e in encs
         ]
         user_data.append({
-            'user': u,
+            'user':    u,
             'surveys': surveys
         })
 
@@ -382,33 +477,68 @@ def mantenedor_usuarios(request, accion, id):
         'usuario': usuario,
     })
 
+@login_required
 @user_passes_test(es_superusuario_activo)
 def mantenedor_preguntas(request, accion, id):
-    pregunta = get_object_or_404(Pregunta, id=id) if int(id) > 0 else None
-
-    if request.method == 'POST':
-        form_pregunta = PreguntaForm(request.POST, instance=pregunta)
-        if form_pregunta.is_valid():
-            form_pregunta.save()
-            messages.success(request, 'Pregunta guardada correctamente.')
-            return redirect('mantenedor_preguntas', accion='actualizar', id=form_pregunta.instance.id)
-        else:
-            messages.error(request, 'No fue posible guardar la pregunta.')
-            show_form_errors(request, [form_pregunta])
-
-    elif request.method == 'GET' and accion == 'eliminar':
-        eliminado, mensaje = eliminar_registro(Pregunta, id)
-        messages.success(request, mensaje)
+    """
+    Mantenedor de preguntas con inline formset de opciones.
+    - accion: 'crear', 'actualizar' o 'eliminar'
+    - id: 0 para crear, o el PK de la pregunta para editar/borrar.
+    """
+    # Validar acción
+    if accion not in ('crear', 'actualizar', 'eliminar'):
+        messages.error(request, 'Acción inválida.')
         return redirect('mantenedor_preguntas', accion='crear', id=0)
+
+    pregunta = None
+    if accion in ('actualizar', 'eliminar'):
+        pregunta = get_object_or_404(Pregunta, pk=id)
+
+    # Eliminar
+    if accion == 'eliminar' and pregunta:
+        pregunta.delete()
+        messages.success(request, 'Pregunta eliminada correctamente.')
+        return redirect('mantenedor_preguntas', accion='crear', id=0)
+
+    # Bind / inicialización
+    if request.method == 'POST':
+        form    = PreguntaForm(request.POST, instance=pregunta)
+        formset = OpcionFormSet(request.POST, instance=pregunta)
+        if form.is_valid() and formset.is_valid():
+            # 1) Guardar pregunta
+            pregunta = form.save(commit=False)
+            if accion == 'crear':
+                siguiente = Pregunta.objects.aggregate(
+                    max_codigo=Max('codigo')
+                )['max_codigo'] or 0
+                pregunta.codigo = siguiente + 1
+            pregunta.save()
+
+            # 2) Reasignar orden automático
+            for idx, subform in enumerate(formset.forms, start=1):
+                # si no está marcado para borrado
+                if not subform.cleaned_data.get('DELETE', False):
+                    subform.instance.orden = idx
+
+            # 3) Guardar opciones
+            formset.instance = pregunta
+            formset.save()
+
+            messages.success(request, 'Pregunta y opciones guardadas correctamente.')
+            return redirect('mantenedor_preguntas', accion='actualizar', id=pregunta.pk)
+        else:
+            messages.error(request, 'Corrige los errores del formulario.')
     else:
-        form_pregunta = PreguntaForm(instance=pregunta)
+        form    = PreguntaForm(instance=pregunta)
+        formset = OpcionFormSet(instance=pregunta)
 
     preguntas = Pregunta.objects.all()
     return render(request, 'core/mantenedor_preguntas.html', {
-        'form_pregunta': form_pregunta,
-        'accion': accion,
-        'pregunta': pregunta,
+        'form':      form,
+        'formset':   formset,
+        'pregunta':  pregunta,
         'preguntas': preguntas,
+        'accion':    accion,
     })
 
 @user_passes_test(es_superusuario_activo)

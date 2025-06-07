@@ -1,8 +1,9 @@
 from django import forms
+from django.forms.models import inlineformset_factory
 from django.forms import ModelForm, Form
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
-from .models import Perfil, Pregunta, PreguntaGD, RespuestaGD
+from .models import Perfil, Pregunta, PreguntaGD, RespuestaGD, OpcionPregunta
 
 # Formulario para ingresar un nuevo usuario
 class IngresarForm(Form):
@@ -12,7 +13,6 @@ class IngresarForm(Form):
         fields = ['username', 'password']
         
 
-# Formulario dinámico para las preguntas de gobernanza de datos
 class GobernanzaForm(forms.Form):
     def __init__(self, *args, **kwargs):
         preguntas = kwargs.pop('preguntas', None)
@@ -20,13 +20,24 @@ class GobernanzaForm(forms.Form):
         if preguntas is None:
             preguntas = Pregunta.objects.all()
         for pregunta in preguntas:
-            field_name = f'respuesta_{pregunta.id}'
+            field_name = f'respuesta_{pregunta.pk}'
+            # Obtenemos todas las opciones para esta pregunta:
+            opts = pregunta.opciones.all()
+            # Si no tiene opciones, dejamos el si/no por defecto:
+            if not opts:
+                choices = [('si', 'Sí'), ('no', 'No')]
+            else:
+                # Sino, construimos choices dinámicamente:
+                # usamos el PK de la opcion como valor, y su texto como label
+                choices = [(opt.pk, opt.texto) for opt in opts]
             self.fields[field_name] = forms.ChoiceField(
                 label=f"{pregunta.dimension} – {pregunta.criterio}: {pregunta.texto}",
-                choices=[('si', 'Sí'), ('no', 'No')],
+                choices=choices,
                 widget=forms.RadioSelect(attrs={'class': 'respuesta-btn'}),
                 required=True,
             )
+            # Guardamos la pregunta en el campo para la vista:
+            self.fields[field_name].pregunta = pregunta
 
 
 # Formulario para registro de nuevo usuario
@@ -40,16 +51,43 @@ class RegistroUsuarioForm(UserCreationForm):
             'password2': 'Confirme su contraseña'
         }
 
-# Formulario para crear preguntas
-class PreguntaForm(forms.ModelForm):
+# Formulario para crear pregunta
+class PreguntaForm(ModelForm):
     class Meta:
         model = Pregunta
-        fields = ['dimension', 'criterio', 'texto']
+        fields = ['codigo', 'dimension', 'criterio', 'texto']
         widgets = {
+            'codigo':    forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
             'dimension': forms.TextInput(attrs={'class': 'form-control'}),
-            'criterio': forms.TextInput(attrs={'class': 'form-control'}),
-            'texto': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'criterio':  forms.TextInput(attrs={'class': 'form-control'}),
+            'texto':     forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
+        labels = {
+            'codigo': 'Código de la pregunta',
+        }
+
+# ————————————————
+# Form para Opciones de Pregunta
+# ————————————————
+class OpcionPreguntaForm(ModelForm):
+    class Meta:
+        model = OpcionPregunta
+        fields = ['texto', 'puntaje', 'orden']
+        widgets = {
+            'texto':   forms.TextInput(attrs={'class': 'form-control'}),
+            'puntaje': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'orden':   forms.NumberInput(attrs={'class': 'form-control'}),
+        }
+
+# Inline formset para ligar Opciones a la Pregunta
+OpcionFormSet = inlineformset_factory(
+    Pregunta,
+    OpcionPregunta,
+    form=OpcionPreguntaForm,
+    extra=1,
+    can_delete=True
+)
+
 
 
 # Formulario para registro de nuevo perfil (empresa)

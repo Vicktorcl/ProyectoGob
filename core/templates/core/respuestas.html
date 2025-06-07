@@ -21,17 +21,17 @@
     <tbody>
       <tr>
         <td>{{ request.user.perfil.nombre_empresa }}</td>
-        {# total_raw es número de respuestas 'sí'; lo multiplicamos por 6 #}
-        <td>{% widthratio total_raw 1 6 %}</td>
-        <td>{{ total_weighted|floatformat:0 }}</td>
+        {# 'total_user' ya es el puntaje real #}
+        <td>{{ total_user|floatformat:1 }}</td>
+        <td>{{ total_weighted|floatformat:1 }}</td>
         <td>{{ total_pct|floatformat:1 }}%</td>
         <td>{{ nivel_global }}</td>
       </tr>
       <tr class="table-secondary">
         <th>Puntaje máximo:</th>
-        {# total_maxraw es cantidad de preguntas; lo multiplicamos por 6 #}
-        <td>{% widthratio total_maxraw 1 6 %}</td>
-        <td>{{ max_weighted }}</td>
+        {# 'total_maxraw' ya es el máximo real #}
+        <td>{{ total_maxraw|floatformat:1 }}</td>
+        <td>{{ max_weighted|floatformat:1 }}</td>
         <td colspan="2"></td>
       </tr>
     </tbody>
@@ -56,12 +56,12 @@
         </thead>
         <tbody>
           {% for dim, data in dimension_scores.items %}
-            {% with raw=data.raw pct=data.pct %}
+            {% with user_sum=data.user_sum pct=data.pct max_sum=data.max_sum %}
             <tr>
               <td>{{ dim }}</td>
-              {# raw es número de 'sí'; lo multiplicamos por 6 #}
-              <td>{% widthratio raw 1 6 %}</td>
-              <td>{{ pct|floatformat:0 }}%</td>
+              {# 'user_sum' ya es el puntaje obtenido en esa dimensión #}
+              <td>{{ user_sum|floatformat:1 }}</td>
+              <td>{{ pct|floatformat:1 }}%</td>
               <td>
                 {% if pct < 25 %}
                   Insuficiente
@@ -73,7 +73,14 @@
                   Avanzado
                 {% endif %}
               </td>
-              <td>8,3 %</td>
+              {# Ponderación de la dimensión = (max_sum / total_maxraw) * 100 #}
+              <td>
+                {% if total_maxraw %}
+                  {% widthratio max_sum total_maxraw 100 %}%
+                {% else %}
+                  0%
+                {% endif %}
+              </td>
             </tr>
             {% endwith %}
           {% endfor %}

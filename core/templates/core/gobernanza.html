@@ -14,19 +14,28 @@ Formulario de Gobernanza de Datos
 {% block content %}
 <div class="container my-5">
   <h2 class="mb-4 text-center">Formulario de Gobernanza de Datos</h2>
-  <form method="post" action="{% url 'guardar_gobernanza' %}">
+  <form method="post" action="{% url 'formulario_gobernanza' %}">
     {% csrf_token %}
 
+    {# Agrupamos preguntas por dimensión #}
     {% regroup preguntas by dimension as dimension_list %}
     <div class="accordion" id="accordionDimensiones">
       {% for group in dimension_list %}
         <div class="accordion-item">
           <h2 class="accordion-header" id="heading{{ forloop.counter }}">
-            <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse{{ forloop.counter }}">
+            <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#collapse{{ forloop.counter }}"
+                    aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
+                    aria-controls="collapse{{ forloop.counter }}">
               {{ group.grouper }}
             </button>
           </h2>
-          <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#accordionDimensiones">
+          <div id="collapse{{ forloop.counter }}"
+               class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+               aria-labelledby="heading{{ forloop.counter }}"
+               data-bs-parent="#accordionDimensiones">
             <div class="accordion-body">
               {% for pregunta in group.list %}
                 <div class="card mb-3">
@@ -34,16 +43,56 @@ Formulario de Gobernanza de Datos
                     <span>Criterio:</span> {{ pregunta.criterio }}
                   </div>
                   <div class="card-body d-flex justify-content-between align-items-center">
-                    <p class="mb-0 me-3">{{ forloop.parentloop.counter }}.{{ forloop.counter }} {{ pregunta.texto }}</p>
+                    <p class="mb-0 me-3">
+                      {{ forloop.parentloop.counter }}.{{ forloop.counter }} {{ pregunta.texto }}
+                    </p>
                     <div class="btn-group" role="group" aria-label="Respuestas">
-                      <label class="btn btn-outline-success respuesta-btn">
-                        <input type="radio" name="respuesta_{{ pregunta.id }}" value="si" required>
-                        Sí
-                      </label>
-                      <label class="btn btn-outline-danger respuesta-btn">
-                        <input type="radio" name="respuesta_{{ pregunta.id }}" value="no" required>
-                        No
-                      </label>
+                      {# Ahora iteramos sobre 'pregunta.lista_opciones' #}
+                      {% if pregunta.lista_opciones %}
+                        {% for opcion in pregunta.lista_opciones %}
+                          <input
+                            class="btn-check"
+                            type="radio"
+                            name="respuesta_{{ pregunta.pk }}"
+                            id="p{{ pregunta.pk }}_o{{ opcion.pk }}"
+                            value="{{ opcion.pk }}"
+                            autocomplete="off"
+                            required>
+                          <label
+                            class="btn btn-outline-secondary respuesta-btn"
+                            for="p{{ pregunta.pk }}_o{{ opcion.pk }}">
+                            {{ opcion.texto }}
+                          </label>
+                        {% endfor %}
+                      {% else %}
+                        {# Si no hay opciones para esta pregunta, muestro Sí/No #}
+                        <input
+                          class="btn-check"
+                          type="radio"
+                          name="respuesta_{{ pregunta.pk }}"
+                          id="p{{ pregunta.pk }}_si"
+                          value="si"
+                          autocomplete="off"
+                          required>
+                        <label
+                          class="btn btn-outline-success respuesta-btn"
+                          for="p{{ pregunta.pk }}_si">
+                          Sí
+                        </label>
+                        <input
+                          class="btn-check"
+                          type="radio"
+                          name="respuesta_{{ pregunta.pk }}"
+                          id="p{{ pregunta.pk }}_no"
+                          value="no"
+                          autocomplete="off"
+                          required>
+                        <label
+                          class="btn btn-outline-danger respuesta-btn"
+                          for="p{{ pregunta.pk }}_no">
+                          No
+                        </label>
+                      {% endif %}
                     </div>
                   </div>
                 </div>
