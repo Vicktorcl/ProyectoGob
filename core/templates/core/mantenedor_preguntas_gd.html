@@ -1,0 +1,129 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}Mantenedor de Preguntas GD{% endblock %}
+
+{% block content %}
+<div class="container border border-dark p-4">
+  <h2 class="text-center">Mantenedor de Preguntas GD</h2>
+
+  {# — Botón para repoblar (superuser) — #}
+  {% if user.is_superuser and user.is_active %}
+    <div class="text-end mb-3">
+      <a href="{% url 'zpoblar2' %}"
+         class="btn btn-sm btn-warning"
+         onclick="return confirm('¿Seguro que quieres repoblar todas las preguntas GD? Se eliminarán las existentes.');">
+        Poblar BD GD
+      </a>
+    </div>
+  {% endif %}
+
+  {# — Formulario de crear/editar — #}
+  <form method="post" id="pregunta-gd-form">
+    {% csrf_token %}
+
+    {# Código: sólo lo mostramos en 'crear'; en 'actualizar' lo ocultamos #}
+    {% if accion == 'crear' %}
+      <div class="mb-3">
+        {{ form.codigo.label_tag }}
+        {{ form.codigo }}
+        {{ form.codigo.errors }}
+      </div>
+    {% else %}
+      {{ form.codigo.as_hidden }}
+    {% endif %}
+
+    <div class="mb-3">
+      {{ form.grupo.label_tag }}
+      {{ form.grupo }}
+      {{ form.grupo.errors }}
+    </div>
+    <div class="mb-3">
+      {{ form.categoria.label_tag }}
+      {{ form.categoria }}
+      {{ form.categoria.errors }}
+    </div>
+    <div class="mb-3">
+      {{ form.area.label_tag }}
+      {{ form.area }}
+      {{ form.area.errors }}
+    </div>
+    <div class="mb-3">
+      {{ form.numero.label_tag }}
+      {{ form.numero }}
+      {{ form.numero.errors }}
+    </div>
+    <div class="mb-3">
+      {{ form.texto.label_tag }}
+      {{ form.texto }}
+      {{ form.texto.errors }}
+    </div>
+    <div class="mb-3">
+      {{ form.peso_area.label_tag }}
+      {{ form.peso_area }}
+      {{ form.peso_area.errors }}
+    </div>
+    <div class="mb-3">
+      {{ form.nivel.label_tag }}
+      {{ form.nivel }}
+      {{ form.nivel.errors }}
+    </div>
+
+    <div class="mt-3 text-center">
+      <button type="submit" class="btn btn-primary">Guardar</button>
+      <a href="{% url 'mantenedor_preguntas_gd' %}" class="btn btn-secondary">Cancelar</a>
+      {% if pregunta %}
+        <a href="{% url 'mantenedor_preguntas_gd' 'eliminar' pregunta.pk %}"
+           class="btn btn-danger"
+           onclick="return confirm('¿Eliminar esta pregunta GD?');">
+          Eliminar
+        </a>
+      {% endif %}
+      <a href="{% url 'mantenedor_preguntas_gd' 'crear' 0 %}" class="btn btn-success">Nueva</a>
+    </div>
+  </form>
+</div>
+
+{# — Tabla de todas las preguntas — #}
+{% if preguntas %}
+  <div class="container mt-4 border border-dark p-3">
+    <table class="table table-hover">
+      <thead class="table-light">
+        <tr>
+          <th>PK</th>
+          <th>Código</th>
+          <th>Grupo</th>
+          <th>Categoría</th>
+          <th>Área</th>
+          <th>Número</th>
+          <th>Nivel</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in preguntas %}
+        <tr>
+          <td>{{ p.pk }}</td>
+          <td>{{ p.codigo }}</td>
+          <td>{{ p.grupo }}</td>
+          <td>{{ p.categoria }}</td>
+          <td>{{ p.area }}</td>
+          <td>{{ p.numero }}</td>
+          <td>{{ p.get_nivel_display }}</td>
+          <td>
+            <a href="{% url 'mantenedor_preguntas_gd' 'actualizar' p.pk %}"
+               class="btn btn-sm btn-primary">Editar</a>
+            <a href="{% url 'mantenedor_preguntas_gd' 'eliminar' p.pk %}"
+               class="btn btn-sm btn-danger"
+               onclick="return confirm('¿Eliminar esta pregunta GD?');">
+              Eliminar
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}

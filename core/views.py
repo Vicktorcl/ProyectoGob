@@ -20,7 +20,7 @@ from .forms import (
     GobernanzaForm, PreguntaForm,
     IngresarForm, UsuarioForm, PerfilForm,
     RegistroUsuarioForm, RegistroPerfilForm,
-    EncuestaGDForm
+    EncuestaGDForm, PreguntaGDForm
 )
 from .tools import eliminar_registro, show_form_errors
 from core.zpoblar import poblar_bd
@@ -539,6 +539,63 @@ def mantenedor_preguntas(request, accion, id):
         'pregunta':  pregunta,
         'preguntas': preguntas,
         'accion':    accion,
+    })
+    
+@login_required
+@user_passes_test(es_superusuario_activo)
+def mantenedor_preguntas_gd_gd(request, accion='listar', id=0):
+    """
+    CRUD para PreguntaGD:
+      - 'listar': muestra todas las preguntas GD
+      - 'crear':  crea una nueva
+      - 'actualizar': edita existente
+      - 'eliminar': borra existente
+    """
+    # Validar acción
+    if accion not in ('listar', 'crear', 'actualizar', 'eliminar'):
+        messages.error(request, 'Acción inválida.')
+        return redirect('mantenedor_preguntas_gd')
+
+    pregunta = None
+    if id > 0:
+        pregunta = get_object_or_404(PreguntaGD, pk=id)
+
+    # ELIMINAR
+    if accion == 'eliminar' and pregunta:
+        pregunta.delete()
+        messages.success(request, 'Pregunta GD eliminada correctamente.')
+        return redirect('mantenedor_preguntas_gd')
+
+    # CREAR / ACTUALIZAR
+    if accion in ('crear', 'actualizar'):
+        if request.method == 'POST':
+            form = PreguntaGDForm(request.POST, instance=pregunta)
+            if form.is_valid():
+                obj = form.save()
+                msg = 'creada' if accion=='crear' else 'actualizada'
+                messages.success(request, f'Pregunta GD {msg} correctamente.')
+                return redirect('mantenedor_preguntas_gd', accion='actualizar', id=obj.pk)
+            else:
+                messages.error(request, 'Corrige los errores del formulario.')
+        else:
+            form = PreguntaGDForm(instance=pregunta)
+
+        # listar preguntas para mostrar al lado del form
+        preguntas = PreguntaGD.objects.all().order_by('grupo','categoria','area','numero')
+        return render(request, 'core/mantenedor_preguntas_gd.html', {
+            'form':      form,
+            'pregunta':  pregunta,
+            'preguntas': preguntas,
+            'accion':    accion,
+        })
+
+    # LISTAR (GET en 'listar')
+    preguntas = PreguntaGD.objects.all().order_by('grupo','categoria','area','numero')
+    return render(request, 'core/mantenedor_preguntas_gd.html', {
+        'form':      None,
+        'pregunta':  None,
+        'preguntas': preguntas,
+        'accion':    'listar',
     })
 
 @user_passes_test(es_superusuario_activo)

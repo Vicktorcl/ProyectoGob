@@ -38,7 +38,9 @@
       <div class="collapse navbar-collapse" id="navbarContent">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
 
-          <li class="nav-item"><a class="nav-link" href="{% url 'inicio' %}">Inicio</a></li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'inicio' %}">Inicio</a>
+          </li>
 
           {% if user.is_authenticated %}
             <!-- Dropdown Encuestas -->
@@ -81,11 +83,18 @@
               </ul>
             </li>
 
-            <li class="nav-item"><a class="nav-link" href="{% url 'nosotros' %}">Nosotros</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'misdatos' %}">Mis datos</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'mipassword' %}">Cambiar contraseña</a></li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'nosotros' %}">Nosotros</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'misdatos' %}">Mis datos</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'mipassword' %}">Cambiar contraseña</a>
+            </li>
 
             {% if user.is_superuser and user.is_active %}
+              <!-- Menú Administrar -->
               <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle" href="#" id="adminDropdown"
                    role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -104,22 +113,42 @@
                       Preguntas Clásicas
                     </a>
                   </li>
-
                   <li>
                     <a class="dropdown-item" href="{% url 'mantenedor_respuestas' %}">
                       Respuestas Clásicas
                     </a>
                   </li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li>
+                    <a class="dropdown-item"
+                       href="{% url 'mantenedor_preguntas_gd' %}">
+                      Preguntas Modelo GD
+                    </a>
+                  </li>
+                  <li>
+                    <a class="dropdown-item"
+                       href="{% url 'seleccionar_encuesta_gd' %}">
+                      Respuestas Modelo GD
+                    </a>
+                  </li>
                 </ul>
               </li>
-              <li class="nav-item"><a class="nav-link" href="/admin">Django Admin</a></li>
+              <li class="nav-item">
+                <a class="nav-link" href="/admin">Django Admin</a>
+              </li>
             {% endif %}
 
-            <li class="nav-item"><a class="nav-link" href="{% url 'salir' %}">Cerrar sesión</a></li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'salir' %}">Cerrar sesión</a>
+            </li>
 
           {% else %}
-            <li class="nav-item"><a class="nav-link" href="{% url 'registro' %}">Registrarse</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'ingresar' %}">Ingresar</a></li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'registro' %}">Registrarse</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'ingresar' %}">Ingresar</a>
+            </li>
           {% endif %}
 
         </ul>

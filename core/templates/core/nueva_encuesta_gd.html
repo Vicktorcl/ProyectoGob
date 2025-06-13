@@ -1,11 +1,17 @@
 {% extends 'core/base.html' %}
 {% block title %}Nueva Encuesta GD{% endblock title %}
 
+{% block extrahead %}
+<style>
+  .pregunta-texto { margin-bottom: .5rem; }
+  .radio-group label { min-width: 100px; }
+</style>
+{% endblock extrahead %}
+
 {% block content %}
 <div class="container my-5">
   <h2 class="mb-4 text-center">Encuesta de Gobernanza de Datos (GD)</h2>
 
-  {# --- Botón para repoblar las preguntas GD (solo superuser) --- #}
   {% if user.is_superuser %}
     <div class="text-end mb-4">
       <a href="{% url 'zpoblar2' %}"
@@ -19,37 +25,81 @@
   <form method="post" action="{% url 'nueva_encuesta_gd' %}">
     {% csrf_token %}
 
-    {# Ahora recorremos preguntas_agrupadas que la vista nos pasa #}
-    {% for grupo, categorias in preguntas_agrupadas.items %}
-      <h3 class="mt-4">{{ grupo }}</h3>
-      {% for categoria, qs in categorias.items %}
-        <h4 class="mt-3">{{ categoria }}</h4>
-        <ul class="list-group mb-4">
-          {% for pregunta in qs %}
-            <li class="list-group-item">
-              <p>
-                <strong>{{ pregunta.area }}.{{ pregunta.numero }}</strong>
-                {{ pregunta.texto }}
-              </p>
-              <div class="btn-group" role="group">
-                {# Las opciones de valoración vienen de RespuestaGD.VALORACION #}
-                {% for val,label in pregunta.respuestagd_set.model.VALORACION %}
-                  <label class="btn btn-outline-primary">
-                    <input type="radio"
-                           name="p_{{ pregunta.id }}"
-                           value="{{ val }}"
-                           required>
-                    {{ label }}
-                  </label>
+    <div class="accordion" id="accordionGrupos">
+      {# --- Por cada Grupo --- #}
+      {% for grupo, categorias in preguntas_agrupadas.items %}
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="headingGrupo{{ forloop.counter }}">
+            <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#collapseGrupo{{ forloop.counter }}"
+                    aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
+                    aria-controls="collapseGrupo{{ forloop.counter }}">
+              {{ grupo }}
+            </button>
+          </h2>
+          <div id="collapseGrupo{{ forloop.counter }}"
+               class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+               aria-labelledby="headingGrupo{{ forloop.counter }}"
+               data-bs-parent="#accordionGrupos">
+            <div class="accordion-body">
+
+              <div class="accordion" id="accordionCat{{ forloop.counter }}">
+                {# --- Por cada Categoría dentro del Grupo --- #}
+                {% for categoria, preguntas in categorias.items %}
+                  <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingCat{{ forloop.parentloop.counter }}_{{ forloop.counter }}">
+                      <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}"
+                              type="button"
+                              data-bs-toggle="collapse"
+                              data-bs-target="#collapseCat{{ forloop.parentloop.counter }}_{{ forloop.counter }}"
+                              aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
+                              aria-controls="collapseCat{{ forloop.parentloop.counter }}_{{ forloop.counter }}">
+                        {{ categoria }}
+                      </button>
+                    </h2>
+                    <div id="collapseCat{{ forloop.parentloop.counter }}_{{ forloop.counter }}"
+                         class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+                         aria-labelledby="headingCat{{ forloop.parentloop.counter }}_{{ forloop.counter }}"
+                         data-bs-parent="#accordionCat{{ forloop.parentloop.counter }}">
+                      <div class="accordion-body">
+                        {# --- Lista de Preguntas --- #}
+                        {% for pregunta in preguntas %}
+                          <div class="mb-4">
+                            <div class="pregunta-texto">
+                              <strong>{{ pregunta.area }}.{{ pregunta.numero }}</strong>
+                              {{ pregunta.texto }}
+                              <small class="text-muted d-block">
+                                Código: {{ pregunta.codigo }} &nbsp;|&nbsp; Nivel: {{ pregunta.get_nivel_display }}
+                              </small>
+                            </div>
+                            <div class="radio-group btn-group" role="group" aria-label="Valoración">
+                              {% for val, label in pregunta.respuestagd_set.model.VALORACION %}
+                                <label class="btn btn-outline-primary btn-sm">
+                                  <input type="radio"
+                                         name="p_{{ pregunta.id }}"
+                                         value="{{ val }}"
+                                         required>
+                                  {{ label }}
+                                </label>
+                              {% endfor %}
+                            </div>
+                          </div>
+                        {% endfor %}
+                      </div>
+                    </div>
+                  </div>
                 {% endfor %}
               </div>
-            </li>
-          {% endfor %}
-        </ul>
-      {% endfor %}
-    {% endfor %}
 
-    <div class="text-center">
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="text-center mt-4">
       <button type="submit" class="btn btn-lg btn-primary">Enviar Encuesta</button>
     </div>
   </form>

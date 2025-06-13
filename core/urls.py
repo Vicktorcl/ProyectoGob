@@ -6,7 +6,8 @@ from .views import (
     mantenedor_usuarios, mantenedor_preguntas,
     poblar_bd_view,
     seleccionar_encuesta, respuestas_view, mantenedor_respuestas,
-    seleccionar_encuesta_gd, nueva_encuesta_gd, reporte_gd, zpoblar2_view
+    seleccionar_encuesta_gd, nueva_encuesta_gd, reporte_gd, zpoblar2_view,mantenedor_preguntas,  # clásico
+    mantenedor_preguntas_gd_gd, 
 )
 
 urlpatterns = [
@@ -41,6 +42,16 @@ urlpatterns = [
     path('gd/seleccionar/', seleccionar_encuesta_gd, name='seleccionar_encuesta_gd'),
     path('gd/nueva/', nueva_encuesta_gd, name='nueva_encuesta_gd'),
     path('gd/reporte/<int:encuesta_id>/', reporte_gd, name='reporte_gd'),
+    path(
+        'mantenedor_preguntas_gd/',
+        mantenedor_preguntas_gd_gd,
+        name='mantenedor_preguntas_gd'
+    ),
+    path(
+        'mantenedor_preguntas_gd/<str:accion>/<int:id>/',
+        mantenedor_preguntas_gd_gd,
+        name='mantenedor_preguntas_gd'
+    ),
 
     # Poblado de BD (superuser)
     path('poblar_bd/', poblar_bd_view, name='poblar_bd'),

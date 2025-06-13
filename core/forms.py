@@ -5,6 +5,40 @@ from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
 from .models import Perfil, Pregunta, PreguntaGD, RespuestaGD, OpcionPregunta
 
+
+class PreguntaGDForm(forms.ModelForm):
+    class Meta:
+        model = PreguntaGD
+        fields = [
+            'codigo',
+            'grupo',
+            'categoria',
+            'area',
+            'numero',
+            'texto',
+            'peso_area',
+            'nivel',
+        ]
+        widgets = {
+            'codigo':     forms.TextInput(attrs={'class': 'form-control'}),
+            'grupo':      forms.TextInput(attrs={'class': 'form-control'}),
+            'categoria':  forms.TextInput(attrs={'class': 'form-control'}),
+            'area':       forms.TextInput(attrs={'class': 'form-control'}),
+            'numero':     forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+            'texto':      forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'peso_area':  forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'nivel':      forms.Select(attrs={'class': 'form-select'}),
+        }
+        labels = {
+            'codigo':    'Código',
+            'grupo':     'Grupo',
+            'categoria': 'Categoría',
+            'area':      'Área',
+            'numero':    'Número',
+            'texto':     'Texto de la pregunta',
+            'peso_area': 'Peso del área',
+            'nivel':     'Nivel de madurez',
+        }
 # Formulario para ingresar un nuevo usuario
 class IngresarForm(Form):
     username = forms.CharField(widget=forms.TextInput(), label="Nombre de usuario")
