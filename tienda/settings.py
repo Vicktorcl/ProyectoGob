@@ -88,18 +88,18 @@ if DATABASE_URL:
             ssl_require=True
         )
     }
-else:
-    # Local PostgreSQL configuration for development
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': 'postgres',
-            'USER': 'postgres',
-            'PASSWORD': 'SYSTEM',
-            'HOST': '127.0.0.1',
-            'PORT': '5432',
-        }
-    }
+# else:
+#     # Local PostgreSQL configuration for development
+#     DATABASES = {
+#         'default': {
+#             'ENGINE': 'django.db.backends.postgresql',
+#             'NAME': 'postgres',
+#             'USER': 'postgres',
+#             'PASSWORD': 'SYSTEM',
+#             'HOST': '127.0.0.1',
+#             'PORT': '5432',
+#         }
+#     }
 
 # CONEXION A BD ORACLE
 # DATABASES = {
