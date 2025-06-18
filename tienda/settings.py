@@ -29,7 +29,7 @@ SECRET_KEY = 'django-insecure-s&f92x^bztt53afi6l)oj-!1%aa6v9=ki@9p%lo!bu_wkx16c(
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
 # Hosts
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'proyectogob.onrender.com,localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'gobernanzaonline.onrender.com,localhost,127.0.0.1').split(',')
 
 # Application definition
 INSTALLED_APPS = [
