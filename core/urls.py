@@ -7,7 +7,7 @@ from .views import (
     poblar_bd_view,
     seleccionar_encuesta, respuestas_view, mantenedor_respuestas,
     seleccionar_encuesta_gd, nueva_encuesta_gd, reporte_gd, zpoblar2_view,mantenedor_preguntas,  # clásico
-    mantenedor_preguntas_gd_gd, 
+    mantenedor_preguntas_gd_gd, mantenedor_respuestas_gd 
 )
 
 urlpatterns = [
@@ -51,6 +51,16 @@ urlpatterns = [
         'mantenedor_preguntas_gd/<str:accion>/<int:id>/',
         mantenedor_preguntas_gd_gd,
         name='mantenedor_preguntas_gd'
+    ),
+    path(
+        'mantenedor_respuestas_gd/',
+        mantenedor_respuestas_gd,
+        name='mantenedor_respuestas_gd'
+    ),
+    path(
+        'mantenedor_respuestas_gd/<str:accion>/<int:id>/',
+        mantenedor_respuestas_gd,
+        name='mantenedor_respuestas_gd'
     ),
 
     # Poblado de BD (superuser)

@@ -1,277 +1,442 @@
 #!/usr/bin/env python
-"""
-core/zpoblar.py
-
-Script para poblar las tablas Pregunta y OpcionPregunta
-a partir de un CSV de “Preguntas-Respuestas-Posibilidades”.
-
-Este CSV tiene las columnas:
-    'texto_concatenado', 'dimensión', 'criterio',
-    'n_pregunta', 'pregunta', 'respuesta',
-    'nivel de madurez_concepto', 'nivel de madurez_valor'
-
-Para ejecutarlo:
-    python core/zpoblar.py
-"""
+# core/zpoblar_hardcode_full.py
 
 import os
 import django
-import pandas as pd
-import traceback
-from django.contrib.auth.models import User
-from django.db import transaction
 from core.models import Pregunta, OpcionPregunta, Encuesta, Respuesta
-
-# -------------------------------------------------------------------
 # 1) CONFIGURACIÓN DE DJANGO
-# -------------------------------------------------------------------
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ProyectoGob.settings')
 django.setup()
 
-# -------------------------------------------------------------------
-# 2) RUTAS Y CONSTANTES
-# -------------------------------------------------------------------
 
-# Ajusta esta ruta si el CSV está en otra carpeta o con otro nombre
-CSV_PATH = os.path.join(
-    os.path.dirname(__file__),
-    'Preguntas-respuestas-posibilidades(Hoja2).csv'
-)
-
-# Usuario al que asignar respuestas por defecto (si lo deseas)
-DEFAULT_USERNAME = 'super123'
-
-# Límite de transacciones “en batch” para no saturar la BD (opcional)
-BATCH_SIZE = 50  # como cada fila crea OpcionPregunta, aumentamos el batch
-
-
-# -------------------------------------------------------------------
-# 3) FUNCIONES AUXILIARES PARA “LIMPIAR” TABLAS
-# -------------------------------------------------------------------
-
-def eliminar_tablas():
-    """
-    Elimina todos los registros de Respuesta, Encuesta, OpcionPregunta y Pregunta.
-    Úsalo con cuidado (solo en desarrollo si quieres reiniciar todo).
-    """
-    print('> Eliminando respuestas existentes...')
-    Respuesta.objects.all().delete()
-
-    print('> Eliminando encuestas existentes...')
-    Encuesta.objects.all().delete()
-
-    print('> Eliminando opciones de pregunta existentes...')
-    OpcionPregunta.objects.all().delete()
-
-    print('> Eliminando preguntas existentes...')
-    Pregunta.objects.all().delete()
-
-
-# -------------------------------------------------------------------
-# 4) LECTURA DEL CSV Y CREACIÓN DE Pregunta + OpcionPregunta
-# -------------------------------------------------------------------
-
-def crear_preguntas_y_opciones():
-    """
-    Lee el CSV con Preguntas y sus posibles respuestas, y llena
-    las tablas Pregunta y OpcionPregunta. Este CSV tiene columnas:
-
-        'n_pregunta'                → código de la pregunta (entero)
-        'dimensión'                 → dimensión (texto)
-        'criterio'                  → criterio (texto)
-        'pregunta'                  → texto completo de la pregunta
-        'respuesta'                 → texto de cada opción
-        'nivel de madurez_valor'    → puntaje asociado a la opción
-
-    El script agrupa las filas por 'n_pregunta' para crear una sola
-    entrada en Pregunta, y luego para cada fila crea una OpcionPregunta.
-    """
-
-    print(f"> Leyendo CSV desde: {CSV_PATH} ...")
-    try:
-        # Intentamos leer con encoding latin-1 y separador ';'
-        df = pd.read_csv(CSV_PATH, sep=';', encoding='latin-1')
-    except Exception as e_latin:
-        print("ERROR al intentar leer el CSV con encoding='latin-1':")
-        traceback.print_exc()
-        print("\nSe intenta de nuevo con UTF-8 + engine='python' ...")
-        try:
-            df = pd.read_csv(CSV_PATH, sep=';', encoding='utf-8', engine='python')
-        except Exception as e_utf8:
-            print("ERROR al intentar leer el CSV con encoding='utf-8' + engine='python':")
-            traceback.print_exc()
-            print("=== No se pudo leer el CSV. Abortando creación de preguntas. ===")
-            return
-
-    # Columnas que realmente trae tu CSV
-    columnas = list(df.columns)
-    columnas_requeridas = ['n_pregunta', 'dimensión', 'criterio', 'pregunta', 'respuesta', 'nivel de madurez_valor']
-    faltantes = [col for col in columnas_requeridas if col not in columnas]
-    if faltantes:
-        print("ERROR: El CSV no contiene las columnas obligatorias:")
-        print(f"       {faltantes}")
-        print(f" Columnas encontradas: {columnas}")
-        return
-
-    # Renombramos columnas para trabajar con nombres “sin tilde” ni espacios
-    df = df.rename(columns={
-        'n_pregunta': 'codigo',
-        'dimensión': 'dimension',
-        'pregunta': 'texto',
-        'respuesta': 'opcion_texto',
-        'nivel de madurez_valor': 'puntaje'
-    })
-
-    total_filas = len(df)
-    print(f"> Filas en el CSV: {total_filas}")
-
-    creadas_preguntas = 0
-    creadas_opciones = 0
-
-    # Vamos a llevar un contador de “orden de opción” por cada pregunta
-    # { codigo_pregunta: siguiente_orden_disponible }
-    orden_por_pregunta = {}
-
-    # Iniciamos una transacción general para mejorar performance
-    with transaction.atomic():
-        for idx, row in df.iterrows():
-            fila_num = idx + 1
-            try:
-                # 1) Obtenemos el código de pregunta y otros campos básicos
-                codigo_raw = row['codigo']
-                try:
-                    codigo = int(codigo_raw)
-                except:
-                    raise ValueError(
-                        f"Columna 'codigo' en fila {fila_num} no es numérico: '{codigo_raw}'"
-                    )
-
-                dimension = str(row['dimension']).strip()
-                criterio  = str(row['criterio']).strip()
-                texto     = str(row['texto']).strip()
-
-                # 2) Creamos o actualizamos la Pregunta (una sola vez por código)
-                pregunta_obj, created_preg = Pregunta.objects.update_or_create(
-                    codigo=codigo,
-                    defaults={
-                        'dimension': dimension,
-                        'criterio':  criterio,
-                        'texto':     texto
-                    }
-                )
-                if created_preg:
-                    creadas_preguntas += 1
-                    print(f"  [PREGUNTA CREADA] fila {fila_num} → código={pregunta_obj.codigo}")
-                    # Inicializamos contador de orden para esta pregunta
-                    orden_por_pregunta[codigo] = 1
-                else:
-                    # Si no se creó, nos aseguramos de tener inicializado su orden
-                    if codigo not in orden_por_pregunta:
-                        # Por defecto, empezamos en 1
-                        orden_por_pregunta[codigo] = 1
-
-                # 3) Procesamos la opción: cada fila del CSV es una opción distinta
-                opcion_texto = str(row['opcion_texto']).strip()
-                puntaje_raw  = row['puntaje']
-
-                if opcion_texto and pd.notna(puntaje_raw):
-                    try:
-                        puntaje = float(puntaje_raw)
-                    except:
-                        raise ValueError(
-                            f"Fila {fila_num}, columna 'puntaje' no es numérico: '{puntaje_raw}'"
-                        )
-
-                    # Tomamos el orden asignado (incremental)
-                    orden_actual = orden_por_pregunta[codigo]
-
-                    # Creamos o actualizamos la OpcionPregunta asociada a esta Pregunta
-                    opc_obj, created_opc = OpcionPregunta.objects.update_or_create(
-                        pregunta=pregunta_obj,
-                        texto=opcion_texto,
-                        defaults={
-                            'puntaje': puntaje,
-                            'orden':   orden_actual
-                        }
-                    )
-                    if created_opc:
-                        creadas_opciones += 1
-                        print(f"    [OPCIÓN CREADA] fila {fila_num} → '{opcion_texto}' (puntaje={puntaje})")
-                    else:
-                        # Si existe una opción con mismo texto para esa pregunta, lo sobreescribimos puntaje y orden
-                        opc_obj.puntaje = puntaje
-                        opc_obj.orden = orden_actual
-                        opc_obj.save()
-
-                    # Incrementamos el contador de orden para la próxima opción de esta misma pregunta
-                    orden_por_pregunta[codigo] += 1
-                else:
-                    # Si la columna "respuesta" viene vacía o el puntaje es NaN, ignoramos esa fila
-                    print(f"    [OMITIDA] fila {fila_num}: opción vacía o puntaje inválido.")
-                    continue
-
-                # 4) Guardado parcial cada BATCH_SIZE filas, para no saturar la BD
-                if (fila_num % BATCH_SIZE) == 0:
-                    print(f">>> Guardado parcial: fila {fila_num} de {total_filas} completada.")
-
-            except Exception as e_fila:
-                print(f"\nERROR procesando fila {fila_num}: {e_fila}")
-                traceback.print_exc()
-                print(f"→ Se omite la fila {fila_num} y se continúa con la siguiente.\n")
-                continue  # seguimos con la siguiente fila
-
-    print(f"\n> Total de preguntas creadas: {creadas_preguntas}")
-    print(f"> Total de opciones creadas:   {creadas_opciones}")
-
-
-# -------------------------------------------------------------------
-# 5) ASIGNAR RESPUESTAS “POR DEFECTO” A UN USUARIO
-# -------------------------------------------------------------------
-
-def asignar_respuestas_por_defecto(username=DEFAULT_USERNAME, valor_por_defecto='si'):
-    """
-    Si necesitas que, tras poblar las preguntas y opciones, exista
-    una Encuesta “vacía” con respuestas por defecto (p.ej. todas 'si'),
-    úsalo. Crea una nueva Encuesta para el usuario dado y asigna
-    a cada Pregunta su Respuesta con “valor_por_defecto”.
-    """
-    try:
-        usuario = User.objects.get(username=username)
-    except User.DoesNotExist:
-        print(f"ERROR: Usuario '{username}' no existe. No se asignarán respuestas por defecto.")
-        return
-
-    encuesta = Encuesta.objects.create(usuario=usuario)
-    asignadas = 0
-
-    for pregunta in Pregunta.objects.all():
-        # Para preguntas “clásicas” sin opciones, asumimos el campo 'valor' en Respuesta
-        # Si tu modelo cambió y ya no usas campo 'valor', adapta esto:
-        Respuesta.objects.create(
-            encuesta=encuesta,
-            pregunta=pregunta,
-            valor=valor_por_defecto
-        )
-        asignadas += 1
-
-    print(f"> Respuestas '{valor_por_defecto}' asignadas a '{username}' en encuesta {encuesta.id}: {asignadas}")
-
-
-# -------------------------------------------------------------------
-# 6) FLUJO PRINCIPAL DE POBLADO
-# -------------------------------------------------------------------
+# 2) LISTA HARD-CODED DE PREGUNTAS + OPCIONES
+PREGUNTAS = [{'codigo': 1,
+  'criterio': 'Visión',
+  'dimension': 'Visión Estratégica',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'}, {'puntaje': 6.0, 'texto': 'Sí'}],
+  'texto': '¿Existe un compromiso directivo formal y efectivo con la gestión y gobernanza de datos como elementos que aportan valor público?'},
+ {'codigo': 2,
+  'criterio': 'Estrategia',
+  'dimension': 'Visión Estratégica',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'}, {'puntaje': 2.0, 'texto': 'Sí, pero de forma indirecta'}, {'puntaje': 6.0, 'texto': 'Sí, de forma clara y explícita'}],
+  'texto': '¿Están incluidos los temas de datos en los objetivos e iniciativas estratégicas de la organización?'},
+ {'codigo': 3,
+  'criterio': 'Presupuesto y Recursos',
+  'dimension': 'Visión Estratégica',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No Aplica'}, {'puntaje': 0.0, 'texto': 'No'}, {'puntaje': 6.0, 'texto': 'Sí'}],
+  'texto': '¿Existe una asignación de presupuestos y recursos para cumplimiento de hoja de ruta o plan de gobernanza? (cuando existe)'},
+ {'codigo': 4,
+  'criterio': 'Capacidades',
+  'dimension': 'Visión Estratégica',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, pero personas específicas en ámbitos específicos del MGDE'},
+               {'puntaje': 4.0, 'texto': 'Sí, equipos que abordan algunos ámbitos del MGDE'},
+               {'puntaje': 6.0, 'texto': 'Sí, equipos que abordan a la mayoría (o todos) los ámbitos del MGDE'}],
+  'texto': '¿Existen actualmente en la institución capacidades para la gestión de datos?'},
+ {'codigo': 5,
+  'criterio': 'Gestión del Cambio',
+  'dimension': 'Visión Estratégica',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, se usa la guía base'},
+               {'puntaje': 4.0, 'texto': 'Sí, adaptada de la guía base'},
+               {'puntaje': 6.0, 'texto': 'Sí, de elaboración propia'}],
+  'texto': '¿Existe un plan de gestión del cambio, ya sea específico en torno a la Ley de Transformación Digital o Institucional que aborde los temas de datos?'},
+ {'codigo': 6,
+  'criterio': 'Alianzas y Colaboraciones',
+  'dimension': 'Visión Estratégica',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Existen unas pocas alianzas o colaboración con otros OAE y/o privados, se cubre lo básico'},
+               {'puntaje': 4.0, 'texto': 'Existen alianzas o colaboraciones con otros OAE y/o privados y se están definiendo mecanismos para ampliarlas'},
+               {'puntaje': 6.0, 'texto': 'Existen alianzas o colaboraciones con otros OAE y/o privados, y existen mecanismos para activamente ampliarlas y explorar nuevas oportunidades'}],
+  'texto': '¿Se cuenta con múltiples alianzas o colaboraciones con otros OAE y/o privados en torno a los datos (intercambio de información, análisis de datos, etc.) y se busca activamente '
+           'ampliarlas?'},
+ {'codigo': 7,
+  'criterio': 'Medición y Seguimiento',
+  'dimension': 'Visión Estratégica',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Se está en proceso de definir las métricas'},
+               {'puntaje': 4.0, 'texto': 'Sí, se cuenta con métricas y se está en proceso de recopilar los datos para evaluar.'},
+               {'puntaje': 6.0, 'texto': 'Sí, se cuenta con métricas, se realizan revisiones periódicas y se realizan ajustes si es necesario.'}],
+  'texto': '¿Existen métricas claras para evaluar el éxito de la estrategia e implantación del MGDE? ¿Se realizan revisiones periódicas para evaluar el progreso y realizar ajustes si es necesario?'},
+ {'codigo': 8,
+  'criterio': 'Política de gobernanza de datos',
+  'dimension': 'Gobernanza de Datos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, se ha adoptado la política base o se ha desarrollado una propia'},
+               {'puntaje': 4.0, 'texto': 'Sí, se ha adaptado la política base (para mejor alineamiento a la institución)'},
+               {'puntaje': 6.0, 'texto': 'Sí, se ha adaptado la política base, alineada con la Ley de TD, y se ha extendido para incluir temas específicos de la institución'}],
+  'texto': '¿Existe una política/estrategia de gobernanza de datos que cubra la gestión de los datos a lo largo de su ciclo de vida, desde su creación hasta su eliminación o archivo?'},
+ {'codigo': 9,
+  'criterio': 'Organización',
+  'dimension': 'Gobernanza de Datos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, rol y/o equipo compartido'},
+               {'puntaje': 4.0, 'texto': 'Sí, rol y/o equipo dedicado'},
+               {'puntaje': 6.0, 'texto': 'Sí, unidad responsable formalmente definida'}],
+  'texto': '¿Existen roles o funciones institucionales responsables del liderazgo de datos?'},
+ {'codigo': 10,
+  'criterio': 'Implementación',
+  'dimension': 'Gobernanza de Datos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, guía base'},
+               {'puntaje': 4.0, 'texto': 'Sí, adaptado de la guía base'},
+               {'puntaje': 6.0, 'texto': 'Sí, de elaboración propia'}],
+  'texto': '¿Existe un plan de implementación de la gobernanza de datos?'},
+ {'codigo': 11,
+  'criterio': 'Herramientas',
+  'dimension': 'Gobernanza de Datos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, planillas, presentaciones, documentos'},
+               {'puntaje': 4.0, 'texto': 'Sí, Herramientas de catálogo'},
+               {'puntaje': 6.0, 'texto': 'Sí, herramientas de gobernanza que cubren más que el catálogo'}],
+  'texto': '¿Se han incorporado herramientas para apoyo a la gobernanza?'},
+ {'codigo': 12,
+  'criterio': 'Capacitación',
+  'dimension': 'Gobernanza de Datos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, básica (seminarios, presentaciones)'},
+               {'puntaje': 4.0, 'texto': 'Sí, a responsables de datos'},
+               {'puntaje': 6.0, 'texto': 'Sí, a equipos que manejan datos'}],
+  'texto': '¿Se han realizado capacitaciones de gobernanza y gestión de datos en base al MGDE (o DAMA) en la institución?'},
+ {'codigo': 13,
+  'criterio': 'Gestión de Riesgos',
+  'dimension': 'Gobernanza de Datos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, se han evaluado y se están definiendo un plan para su gestión'},
+               {'puntaje': 4.0, 'texto': 'Sí, se han evaluado y se están desarrollando los procesos para su gestión'},
+               {'puntaje': 6.0, 'texto': 'Sí, se han evaluado y se cuenta con procesos para su gestión'}],
+  'texto': '¿Se han identificado y evaluado los riesgos asociados con la gestión de datos y existen procesos para mitigar y gestionar estos riesgos de manera efectiva?'},
+ {'codigo': 14,
+  'criterio': 'Gestión ética de datos',
+  'dimension': 'Gobernanza de Datos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'}, {'puntaje': 6.0, 'texto': 'Sí'}],
+  'texto': '¿Existen políticas, directivas o estándares para promover el uso ético de datos?'},
+ {'codigo': 15,
+  'criterio': 'Arquitectura Institucional de datos',
+  'dimension': 'Arquitectura, Diseño y Documentación',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, en documento o presentación'},
+               {'puntaje': 4.0, 'texto': 'Sí, mediante clasificaciones y/o modelos de alto nivel para algunos datos, en algunas áreas (los más relevantes).'},
+               {'puntaje': 6.0, 'texto': 'Sí, mediante clasificaciones y/o modelos de alto nivel para la totalidad de la información relevante'}],
+  'texto': '¿Existe una conceptualización formalizada de la información relevante para el quehacer institucional?'},
+ {'codigo': 16,
+  'criterio': 'Catálogo',
+  'dimension': 'Arquitectura, Diseño y Documentación',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, levantamiento general (documentos, planillas)'},
+               {'puntaje': 4.0,
+                'texto': 'Sí, catálogo parcial con definiciones de acceso (seguridad) y caracterización de datos personales, para algunos datos en algunas áreas (los más relevantes).'},
+               {'puntaje': 6.0,
+                'texto': 'Sí, catálogo documentado, con definiciones de acceso (seguridad) y caracterización de datos personales, de los datos relevantes y con procedimiento para su actualización.'}],
+  'texto': '¿Existe un levantamiento, catálogo o inventario de los datos que maneja la institución?'},
+ {'codigo': 17,
+  'criterio': 'Catálogo',
+  'dimension': 'Arquitectura, Diseño y Documentación',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'No, pero se está en proceso de definición'},
+               {'puntaje': 4.0, 'texto': 'Sí y se cuenta con un plan para su aplicación'},
+               {'puntaje': 6.0, 'texto': 'Sí y se aplica sistemáticamente'}],
+  'texto': '¿Existe evaluación de la calidad de los catálogos o inventarios de datos?'},
+ {'codigo': 18,
+  'criterio': 'Modelos y Documentación',
+  'dimension': 'Arquitectura, Diseño y Documentación',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, parcial o desactualizado y sólo para algunas bases de datos o de documentos.'},
+               {'puntaje': 4.0, 'texto': 'Sí, actualizada para las bases de datos o de documentos más relevantes.'},
+               {'puntaje': 6.0, 'texto': 'Sí, para todas las bases de datos o de documentos relevantes y procedimiento para su actualización.'}],
+  'texto': '¿Existen modelos o documentación (diseño, diccionario de datos) de las bases de datos?'},
+ {'codigo': 19,
+  'criterio': 'Metadatos',
+  'dimension': 'Arquitectura, Diseño y Documentación',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'No, pero se está en proceso de definición'},
+               {'puntaje': 4.0, 'texto': 'Si y se cuenta con un plan para su aplicación'},
+               {'puntaje': 6.0, 'texto': 'Si y se aplica de manera sistemática'}],
+  'texto': '¿Existen directrices y estándares para la definición y gestión de metadatos asociados a datos y documentos?'},
+ {'codigo': 20,
+  'criterio': 'Metadatos',
+  'dimension': 'Arquitectura, Diseño y Documentación',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, algunos metadatos asociados a bases de datos o de documentos determinados, pero no existe un estándar.'},
+               {'puntaje': 4.0, 'texto': 'Sí, existe un estándar de metadatos aplicado a las bases de datos o de documentos más relevantes.'},
+               {'puntaje': 6.0, 'texto': 'Sí, existen un estándar de metadatos aplicado a todos las bases de datos o de documentos relevantes y herramientas para gestionarlos'}],
+  'texto': '¿Existen metadatos asociados a las bases de datos?'},
+ {'codigo': 21,
+  'criterio': 'Gestión de la operación y almacenamiento',
+  'dimension': 'Almacenamiento y Operación',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, para las bases más relevantes.'},
+               {'puntaje': 4.0, 'texto': 'Sí, incluyendo monitoreo de las bases más relevantes.'},
+               {'puntaje': 6.0,
+                'texto': 'Sí, incluyendo monitoreo y planes de crecimiento/mejora (planificación de la capacidad o capacity planning), para todas las bases de datos relevantes con herramientas '
+                         'especializadas.'}],
+  'texto': '¿Se gestiona la operación y el almacenamiento de los datos mediante la administración de las bases, internamente o con apoyo externo?'},
+ {'codigo': 22,
+  'criterio': 'Seguridad',
+  'dimension': 'Seguridad y Ciberseguridad de Datos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, pero no se auditan.'},
+               {'puntaje': 4.0, 'texto': 'Sí, existe un Sistema de Gestión de Seguridad de la Información (SGSI) con políticas y procedimientos de seguridad, pero requiere ajuste y/o auditoria.'},
+               {'puntaje': 6.0, 'texto': 'Sí, existe un Sistema de Gestión de Seguridad de la Información (SGSI) con políticas y procedimientos de seguridad activo y auditado periódicamente.'}],
+  'texto': '¿Existen políticas y procedimientos para el cumplimiento de la normativa de seguridad de la información?'},
+ {'codigo': 23,
+  'criterio': 'Ciberseguridad',
+  'dimension': 'Seguridad y Ciberseguridad de Datos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí'},
+               {'puntaje': 4.0, 'texto': 'Sí y se validan regularmente en forma interna.'},
+               {'puntaje': 6.0, 'texto': 'Sí y se validan por terceros y se actualizan regularmente.'}],
+  'texto': '¿Existen políticas y procedimientos de ciberseguridad de la información?'},
+ {'codigo': 24,
+  'criterio': 'Protección de Datos Personales',
+  'dimension': 'Seguridad y Ciberseguridad de Datos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'}, {'puntaje': 6.0, 'texto': 'Sí'}],
+  'texto': '¿Existe un responsable de la protección de datos?'},
+ {'codigo': 25,
+  'criterio': 'Protección de Datos Personales',
+  'dimension': 'Seguridad y Ciberseguridad de Datos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí'},
+               {'puntaje': 4.0, 'texto': 'Sí, incluyendo mecanismos de anonimización (en caso de ser necesarios) que son validados por terceros regularmente.'},
+               {'puntaje': 6.0, 'texto': 'Sí, incluyendo mecanismos de anonimización que son validados por terceros regularmente.'}],
+  'texto': '¿Existen políticas y procedimientos asociados al cumplimiento de la privacidad y protección de datos personales?'},
+ {'codigo': 26,
+  'criterio': 'Protección de Datos Personales',
+  'dimension': 'Seguridad y Ciberseguridad de Datos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'}, {'puntaje': 6.0, 'texto': 'Sí'}],
+  'texto': '¿Existen directrices para la anonimización de datos cuando es requerido?'},
+ {'codigo': 27,
+  'criterio': 'Recuperación ante desastres',
+  'dimension': 'Seguridad y Ciberseguridad de Datos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, existen mecanismos de respaldo y recuperación'},
+               {'puntaje': 4.0, 'texto': 'Sí, existe plan de recuperación ante desastres (DRP)'},
+               {'puntaje': 6.0, 'texto': 'Sí, existe plan de recuperación ante desastres (DRP) y plan de continuidad de negocio (BCP) probado, operativo y conocido por toda la institución.'}],
+  'texto': '¿Existen mecanismos de respaldo y recuperación, planes de recuperación ante desastres (DRP) o planes de continuidad de negocio (BCP) probados y operativos?'},
+ {'codigo': 28,
+  'criterio': 'Integración',
+  'dimension': 'Integración e Interoperabilidad',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, para algunas bases'},
+               {'puntaje': 4.0, 'texto': 'Sí, para las bases más relevantes.'},
+               {'puntaje': 6.0, 'texto': 'Sí, para todas las bases relevantes'}],
+  'texto': '¿Existen mecanismos de integración y consolidación de datos mediante herramientas tipo ETL o Ingesta para las bases de datos y/o bases de gestión (datamart, datawarehouse, datalake)?'},
+ {'codigo': 29,
+  'criterio': 'Interoperabilidad',
+  'dimension': 'Integración e Interoperabilidad',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, pero son los mínimos necesarios'},
+               {'puntaje': 4.0, 'texto': 'Sí, y se está buscando ampliarlos'},
+               {'puntaje': 6.0, 'texto': 'Sí, todos los necesarios'}],
+  'texto': '¿Existen acuerdos de acceso y/o intercambio de datos con terceros, sean estas instituciones del sector público, privado o internacional?'},
+ {'codigo': 30,
+  'criterio': 'Interoperabilidad',
+  'dimension': 'Integración e Interoperabilidad',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, incluyendo mecanismos de interoperabilidad ya sea mediante PISEE 2.0 u otros.'},
+               {'puntaje': 4.0, 'texto': 'Sí y se han habilitado y se utilizan regularmente (como parte de la operación) algunos servicios de interoperabilidad ya sea mediante PISEE 2.0 u otros.'},
+               {'puntaje': 6.0, 'texto': 'Sí y todo el intercambio de información con otras entidades se realiza mediante la plataforma PISEE 2.0'}],
+  'texto': '¿Se han identificado los requerimientos de interoperabilidad (tanto de entrada como de salida) y existen mecanismos de interoperabilidad?'},
+ {'codigo': 31,
+  'criterio': 'Interoperabilidad',
+  'dimension': 'Integración e Interoperabilidad',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'}, {'puntaje': 6.0, 'texto': 'Sí'}],
+  'texto': '¿Se utiliza la Plataforma de Interoperabilidad del Estado para la interoperabilidad con otras instituciones?'},
+ {'codigo': 32,
+  'criterio': 'Definiciones',
+  'dimension': 'Documentos y Contenidos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, existe diagnóstico y se está trabajando en la política'},
+               {'puntaje': 4.0,
+                'texto': 'Sí, existe una política de gestión documental que incluye la definición de ciclo de vida, la clasificación, valoración, retención y eliminación de documentos en proceso de '
+                         'implementación.'},
+               {'puntaje': 6.0, 'texto': 'Sí, existen una política de gestión documental, procesos asociados y mecanismos de evaluación y seguimiento.'}],
+  'texto': '¿Existe un diagnóstico del estado de la gestión documental y una política de gestión documental?'},
+ {'codigo': 33,
+  'criterio': 'Metadatos',
+  'dimension': 'Documentos y Contenidos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí'},
+               {'puntaje': 4.0, 'texto': 'Sí y se está trabajando en el plan de cumplimiento'},
+               {'puntaje': 6.0, 'texto': 'Sí, se cumple a cabalidad con el documento'}],
+  'texto': '¿Se ha revisado la definición del documento "Metadatos para la Gestión Documental de las Instituciones Públicas" identificando las brechas y generando un plan de cumplimiento?'},
+ {'codigo': 34,
+  'criterio': 'Expediente Electrónico',
+  'dimension': 'Documentos y Contenidos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí'},
+               {'puntaje': 4.0, 'texto': 'Sí y se está trabajando en su implementación'},
+               {'puntaje': 6.0, 'texto': 'Sí y se cumple a cabalidad'}],
+  'texto': '¿Se cuenta con una definición y plan de implementación del expediente electrónico de acuerdo a lo requerido en la Ley 21.180 (Ley de TD)?'},
+ {'codigo': 35,
+  'criterio': 'Repositorio Documental',
+  'dimension': 'Documentos y Contenidos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí en una o más áreas.'},
+               {'puntaje': 4.0, 'texto': 'Sí y cumplen con los estándares definidos en la política institucional de gestión documental.'},
+               {'puntaje': 6.0, 'texto': 'Sí y se han implementado sistemáticamente cumpliendo los estándares definidos en la política institucional de gestión documental.'}],
+  'texto': '¿Se ha incorporado una herramienta de repositorio documental?'},
+ {'codigo': 36,
+  'criterio': 'Datos referenciales',
+  'dimension': 'Datos Maestros y de Referencia',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, los códigos básicos para datos que se comparten entre áreas y/o con externos.'},
+               {'puntaje': 4.0, 'texto': 'Sí, todos los códigos para los datos más relevantes que se comparten entre áreas y/o con externos.'},
+               {'puntaje': 6.0, 'texto': 'Sí, los códigos para todos los datos relevantes que se comparten entre áreas y/o con externos.'}],
+  'texto': '¿Existen estandarización de códigos de la información que se comparte entre áreas y/o con externos?'},
+ {'codigo': 37,
+  'criterio': 'Datos maestros',
+  'dimension': 'Datos Maestros y de Referencia',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, pero no están consolidados ni gestionados centralmente.'},
+               {'puntaje': 4.0, 'texto': 'Sí, algunos datos maestros, los más relevantes o prioritarios, están consolidados y gestionados, aunque no centralmente.'},
+               {'puntaje': 6.0, 'texto': 'Sí, los datos maestros relevantes están consolidados y gestionados centralmente.'}],
+  'texto': '¿Existe una identificación de los datos maestros y estos se consolidan y gestionan centralmente?'},
+ {'codigo': 38,
+  'criterio': 'Herramientas',
+  'dimension': 'Datos Maestros y de Referencia',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, se cuenta con desarrollos ad-hoc'},
+               {'puntaje': 4.0, 'texto': 'Sí, se está en proceso de implementación de herramientas MDM'},
+               {'puntaje': 6.0, 'texto': 'Sí, se cuenta con herramientas de MDM completamente implementadas'}],
+  'texto': '¿Se cuenta con desarrollos ad-hoc o herramientas de Master Data Management (MDM) que apoyan la gestión de los datos maestros y referenciales?'},
+ {'codigo': 39,
+  'criterio': 'Toma de decisiones basada en información',
+  'dimension': 'Analítica e Inteligencia de Negocios',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, existe la definición institucional y se está trabajando en incorporar la práctica'},
+               {'puntaje': 4.0, 'texto': 'Sí, existe la definición institucional y la práctica a nivel de algunas unidades'},
+               {'puntaje': 6.0, 'texto': 'Sí, existe la definición y la práctica a nivel institucional'}],
+  'texto': '¿Existe la definición institucional y la práctica de hacer análisis de datos para la gestión y toma de decisiones?'},
+ {'codigo': 40,
+  'criterio': 'Información de gestión',
+  'dimension': 'Analítica e Inteligencia de Negocios',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí y abordan algunos ámbitos de la gestión institucional'},
+               {'puntaje': 4.0, 'texto': 'Sí y abordan los principales ámbitos de la gestión institucional'},
+               {'puntaje': 6.0, 'texto': 'Sí y abordan los principales ámbitos de gestión institucional y se incorporan nuevos proyectos en la medida de las necesidades.'}],
+  'texto': '¿Existen repositorios de gestión de tipo data mart / data warehouse o data lake para la gestión institucional?'},
+ {'codigo': 41,
+  'criterio': 'Herramientas',
+  'dimension': 'Analítica e Inteligencia de Negocios',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, de inteligencia de negocios para visualización de información (paneles de control)'},
+               {'puntaje': 4.0, 'texto': 'Sí, de inteligencia de negocios y analítica o ciencia de datos, incluyendo IA'},
+               {'puntaje': 6.0, 'texto': 'Sí, de inteligencia de negocios y analítica o ciencia de datos, incluyendo IA utilizadas institucionalmente'}],
+  'texto': '¿Existen herramientas de tipo inteligencia de negocios y otras para hacer analítica o ciencia de datos, incluyendo IA?'},
+ {'codigo': 42,
+  'criterio': 'Definición',
+  'dimension': 'Calidad de Datos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Se está trabajando en generarla'},
+               {'puntaje': 4.0, 'texto': 'Sí, existe una definición que se está en proceso de aplicar'},
+               {'puntaje': 6.0, 'texto': 'Sí, existe una definición de calidad de datos que se evalúa y controla en los procesos definidos'}],
+  'texto': '¿Existe una definición de calidad de datos que permita evaluar y auditar la calidad de datos a nivel institucional?'},
+ {'codigo': 43,
+  'criterio': 'Metodología y Herramientas',
+  'dimension': 'Calidad de Datos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Se han identificado y evaluado'},
+               {'puntaje': 4.0, 'texto': 'Sí, se está en el proceso de incorporar metodologías (o estándares) y herramientas.'},
+               {'puntaje': 6.0, 'texto': 'Sí, y se aplican de manera regular en todos los procesos relevantes'}],
+  'texto': '¿Se utilizan metodologías (o estándares) y herramientas para la gestión de calidad?'},
+ {'codigo': 44,
+  'criterio': 'Definiciones',
+  'dimension': 'Datos Abiertos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'}, {'puntaje': 6.0, 'texto': 'Sí'}],
+  'texto': '¿Existe una estrategia de datos abiertos?'},
+ {'codigo': 45,
+  'criterio': 'Definiciones',
+  'dimension': 'Datos Abiertos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sí, existe la definición institucional y se está trabajando activamente en iniciativas específicas.'},
+               {'puntaje': 4.0, 'texto': 'Sí, existe la definición institucional y existen avances concretos.'},
+               {'puntaje': 6.0, 'texto': 'Sí, existe la definición institucional y se cumplen a cabalidad (salvo los casos justificados) los principios de datos abiertos.'}],
+  'texto': '¿Se ha incorporado institucionalmente la definición de datos abiertos por defecto y los principios de datos abiertos (Open Data Charter)?'},
+ {'codigo': 46,
+  'criterio': 'Publicación',
+  'dimension': 'Datos Abiertos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'SÍ, datos básicos'},
+               {'puntaje': 4.0, 'texto': 'Sí, datos procesados o consolidados'},
+               {'puntaje': 6.0, 'texto': 'Sí, datos evaluados como de alto valor'}],
+  'texto': '¿Se publican datos abiertos de manera regular?'},
+ {'codigo': 47,
+  'criterio': 'Publicación',
+  'dimension': 'Datos Abiertos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No se publica'},
+               {'puntaje': 2.0, 'texto': 'Portal propio'},
+               {'puntaje': 4.0, 'texto': 'Portal nacional'},
+               {'puntaje': 6.0, 'texto': 'Portal propio y portal nacional'}],
+  'texto': 'Si se publican datos abiertos ¿en qué lugar se publican?'},
+ {'codigo': 48,
+  'criterio': 'Publicación',
+  'dimension': 'Datos Abiertos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No o no son suficientes'},
+               {'puntaje': 2.0, 'texto': 'No, pero se están definiendo'},
+               {'puntaje': 4.0, 'texto': 'Sí, aunque están en proceso de implementación o redefinición'},
+               {'puntaje': 6.0, 'texto': 'Sí y son efectivos'}],
+  'texto': '¿Existen las condiciones (recursos) e incentivos para la publicación de datos abiertos?'},
+ {'codigo': 49,
+  'criterio': 'Publicación',
+  'dimension': 'Datos Abiertos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'No, pero se está desarrollado un plan de cumplimiento'},
+               {'puntaje': 4.0, 'texto': 'Sí, se está implementando el plan de cumplimiento'},
+               {'puntaje': 6.0, 'texto': 'Sí, se cumple a cabalidad la normativa'}],
+  'texto': '¿Se incentiva la publicación de datasets de alta contribución según lo que estipula la normativa de datos abiertos y estrategia nacional de datos abiertos?'},
+ {'codigo': 50,
+  'criterio': 'Mecanismos de acceso, formato, documentación y condiciones de uso',
+  'dimension': 'Datos Abiertos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No Aplica (no se publican datos abiertos)'},
+               {'puntaje': 2.0, 'texto': 'Descargables no siempre documentados y en algunos casos en formatos de imagen (documentos)'},
+               {'puntaje': 4.0, 'texto': 'Descargables, documentados y con formatos siempre legibles (no imágenes)'},
+               {'puntaje': 6.0, 'texto': 'Descargables y accesibles mediante APIs, documentados, con formatos siempre legibles (no imágenes) y con condiciones de uso definida (licencia)'}],
+  'texto': '¿Con qué mecanismos de acceso, formato, documentación y condiciones de uso se publican los datos abiertos?'},
+ {'codigo': 51,
+  'criterio': 'Participación del área jurídica',
+  'dimension': 'Aspectos Legales y Normativos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'Sólo es informada'},
+               {'puntaje': 4.0, 'texto': 'Es informada y valida'},
+               {'puntaje': 6.0, 'texto': 'Participa en la definición y validación'}],
+  'texto': '¿Existe participación del área jurídica en la definición y validación de políticas y procedimientos de gobierno de datos para asegurar cumplimiento de las leyes y normativas?'},
+ {'codigo': 52,
+  'criterio': 'Cumplimiento aspectos legales y normativos',
+  'dimension': 'Aspectos Legales y Normativos',
+  'opciones': [{'puntaje': 0.0, 'texto': 'No'},
+               {'puntaje': 2.0, 'texto': 'SÍ, se ha realizado revisión y definido plan de cumplimiento'},
+               {'puntaje': 4.0, 'texto': 'Sí, se ha realizado revisión y se está aplicando plan de cumplimiento'},
+               {'puntaje': 6.0, 'texto': 'Sí, se cumple y se cuenta con procedimientos para garantizar cumplimiento frente a cambios'}],
+  'texto': '¿Se cumple con las regulaciones y estándares relevantes en cuanto a la gestión y protección de datos personales (PDP) y existen procedimientos para garantizar el cumplimiento frente a '
+           'cambios legislativos o normativos?'}]
 
 def poblar_bd():
-    print("=== Iniciando poblamiento de Pregunta y OpcionPregunta desde CSV ===")
-    eliminar_tablas()
-    crear_preguntas_y_opciones()
+    print('→ Limpiando tabla Pregunta y OpcionPregunta…')
+    Pregunta.objects.all().delete()
+    OpcionPregunta.objects.all().delete()
 
-    # Si deseas asignar respuestas por defecto, descomenta la línea siguiente:
-    # asignar_respuestas_por_defecto()
+    tot_p = tot_o = 0
+    for p in PREGUNTAS:
+        pregunta_obj = Pregunta.objects.create(
+            codigo    = p['codigo'],
+            dimension = p['dimension'],
+            criterio  = p['criterio'],
+            texto     = p['texto'],
+        )
+        tot_p += 1
 
-    print(">>> Proceso de poblamiento completado.")
+        for idx, opt in enumerate(p['opciones'], start=1):
+            OpcionPregunta.objects.create(
+                pregunta = pregunta_obj,
+                texto    = opt['texto'],
+                puntaje  = opt['puntaje'],
+                orden    = idx,
+            )
+            tot_o += 1
 
+    print(f'>> Total preguntas creadas: {tot_p}')
+    print(f'>> Total opciones creadas:   {tot_o}')
 
-# -------------------------------------------------------------------
-# 7) CUERPO PRINCIPAL
-# ----------------------------------------------
+if __name__ == '__main__':
+    poblar_hardcode()

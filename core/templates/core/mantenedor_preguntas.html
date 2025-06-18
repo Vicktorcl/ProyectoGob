@@ -21,10 +21,6 @@
 
   <form method="post" id="pregunta-form">
     {% csrf_token %}
-
-    {# ===================== #}
-    {# Campo CÓDIGO         #}
-    {# ===================== #}
     {% if accion == 'crear' %}
       <div class="mb-3">
         {{ form.codigo.label_tag }}
@@ -34,10 +30,6 @@
     {% else %}
       {{ form.codigo.as_hidden }}
     {% endif %}
-
-    {# ===================== #}
-    {# Campos de PREGUNTA    #}
-    {# ===================== #}
     <div class="mb-3">
       {{ form.dimension.label_tag }}
       {{ form.dimension }}
@@ -53,17 +45,11 @@
       {{ form.texto }}
       {{ form.texto.errors }}
     </div>
-
     <hr>
-
-    {# ===================== #}
-    {# Opciones de RESPUESTA #}
-    {# ===================== #}
     <h4>Opciones de Respuesta</h4>
     <button type="button" class="btn btn-sm btn-success mb-2" id="add-option">
       + Añadir opción
     </button>
-
     {{ formset.management_form }}
     <table class="table table-bordered" id="opciones-table">
       <thead class="table-light">
@@ -76,12 +62,9 @@
       <tbody>
         {% for subform in formset %}
           <tr class="opcion-form-row">
-            {# Campo oculto id para que formset reconozca la instancia #}
             {{ subform.id }}
-            {# Ocultamos el campo 'orden', se asignará automáticamente en la vista #}
             {{ subform.orden.as_hidden }}
             {{ subform.DELETE.as_hidden }}
-
             <td>
               {{ subform.texto }}
               {{ subform.texto.errors }}
@@ -99,7 +82,6 @@
         {% endfor %}
       </tbody>
     </table>
-
     <div class="mt-3 text-center">
       <button type="submit" class="btn btn-primary">Guardar</button>
       <a href="{% url 'mantenedor_preguntas' 'crear' 0 %}" class="btn btn-success">Nueva</a>
@@ -116,7 +98,13 @@
 
 {% if preguntas %}
   <div class="container mt-4">
-    <table class="table table-hover">
+
+    {# Buscador agregado aquí #}
+    <div class="mb-3">
+      <input type="text" id="buscadorPreguntasClasicas" class="form-control" placeholder="Buscar pregunta...">
+    </div>
+
+    <table class="table table-hover" id="tablaPreguntasClasicas">
       <thead>
         <tr>
           <th>PK</th>
@@ -155,47 +143,58 @@
 {% block script %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+  // --- Buscador en tabla de preguntas clásicas ---
+  const input = document.getElementById('buscadorPreguntasClasicas');
+  if (input) {
+    const table = document.getElementById('tablaPreguntasClasicas').getElementsByTagName('tbody')[0];
+    input.addEventListener('keyup', function() {
+      const filtro = input.value.toLowerCase();
+      for (let row of table.rows) {
+        let mostrar = false;
+        for (let cell of row.cells) {
+          if (cell.textContent.toLowerCase().includes(filtro)) {
+            mostrar = true;
+            break;
+          }
+        }
+        row.style.display = mostrar ? '' : 'none';
+      }
+    });
+  }
+
+  // --- Formset dinámico para opciones ---
   const addBtn = document.getElementById('add-option');
   const tableBody = document.querySelector('#opciones-table tbody');
-  // El prefijo de tu formset (por defecto suele ser "form")
   const prefix = '{{ formset.prefix }}';
   const totalForms = document.querySelector(`#id_${prefix}-TOTAL_FORMS`);
-
   addBtn.addEventListener('click', () => {
     const currentCount = parseInt(totalForms.value, 10);
     const newIndex = currentCount;
     const firstRow = document.querySelectorAll('.opcion-form-row')[0];
     const emptyRow = firstRow.cloneNode(true);
-
-    // Reemplazar índices en los atributos name e id de los inputs clonados
     emptyRow.querySelectorAll('input, select, textarea').forEach(el => {
       const name = el.getAttribute('name');
       if (!name) return;
       const newName = name.replace(`-${0}-`, `-${newIndex}-`);
       el.setAttribute('name', newName);
       el.setAttribute('id', `id_${newName}`);
-      // Limpiar valor (no ocultos)
       if (el.type !== 'hidden') el.value = '';
-      // Si existía el DELETE, reiniciarlo
       if (el.name.endsWith('-DELETE')) {
         el.checked = false;
       }
     });
-
     tableBody.appendChild(emptyRow);
     totalForms.value = newIndex + 1;
   });
-
-  // Delegación para los botones "Eliminar" de opciones
   tableBody.addEventListener('click', e => {
     if (e.target.matches('.remove-option')) {
       const row = e.target.closest('tr');
       const deleteInput = row.querySelector(`input[name$='-DELETE']`);
       if (deleteInput) {
-        deleteInput.checked = true;    // marca para borrado
-        row.style.display = 'none';    // oculta la fila
+        deleteInput.checked = true;
+        row.style.display = 'none';
       } else {
-        row.remove();                  // fila recién añadida
+        row.remove();
         totalForms.value = parseInt(totalForms.value, 10) - 1;
       }
     }

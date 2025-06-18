@@ -146,11 +146,11 @@ class Respuesta(models.Model):
 # ------------------------------------------------------------------
 class PreguntaGD(models.Model):
     NIVEL_CHOICES = [
-        ('inicial', 'Inicial'),
-        ('gestionado', 'Gestionado'),
-        ('definido', 'Definido'),
-        ('medido', 'Medido'),
-        ('optimo', 'Óptimo'),
+        (1, 'Inicial'),
+        (2, 'Gestionado'),
+        (3, 'Definido'),
+        (4, 'Medido'),
+        (5, 'Optimizado'),
     ]
     codigo = models.CharField(max_length=10)
     grupo = models.CharField(max_length=200)
@@ -162,7 +162,7 @@ class PreguntaGD(models.Model):
         max_digits=5, decimal_places=2,
         help_text="Peso del área (suma 100 por categoría)"
     )
-    nivel = models.CharField(max_length=20, choices=NIVEL_CHOICES)
+    nivel = models.PositiveSmallIntegerField(max_length=20, choices=NIVEL_CHOICES)
 
     class Meta:
         verbose_name = 'Pregunta GD'

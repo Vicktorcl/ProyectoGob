@@ -1,75 +1,78 @@
 {% extends 'core/base.html' %}
 {% load static %}
 
-{% block title %}Reporte GD — Encuesta #{{ encuesta.id }}{% endblock title %}
+{% block title %}Reporte GD — Encuesta #{{ encuesta.id }}{% endblock %}
 
 {% block content %}
 <div class="container my-5">
-  <h2 class="mb-4 text-center">
+  <h2 class="text-center mb-4">
     Reporte GD de {{ encuesta.usuario.username }} — {{ encuesta.fecha|date:"Y-m-d H:i" }}
   </h2>
-
   <div class="row">
-    <!-- Columna del radar -->
-    <div class="col-md-6">
-      <canvas id="radarChartGD" height="350"></canvas>
+    <!-- 1) Gráfico radar arriba, ancho completo, alto 400px -->
+    <div class="col-12 mb-4">
+      <div style="position: relative; width: 100%; height: 400px;">
+        <canvas id="radarChartGD"></canvas>
+      </div>
     </div>
 
-    <!-- Columna del detalle por Grupo -->
-    <div class="col-md-6">
-      <h4 class="mb-3">Detalle por Área de Proceso</h4>
-      <div class="accordion" id="accordionGrupo">
-        {% for grupo in groups %}
-        <div class="accordion-item">
-          <h2 class="accordion-header" id="heading{{ forloop.counter }}">
-            <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}"
-                    type="button"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#collapse{{ forloop.counter }}"
-                    aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
-                    aria-controls="collapse{{ forloop.counter }}">
-              Grupo {{ grupo }}
-            </button>
-          </h2>
-          <div id="collapse{{ forloop.counter }}"
-               class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
-               aria-labelledby="heading{{ forloop.counter }}"
-               data-bs-parent="#accordionGrupo">
-            <div class="accordion-body p-0">
-              <table class="table table-bordered table-sm mb-0">
-                <thead class="table-light">
-                  <tr>
-                    <th>Categoría</th>
-                    <th>Área de Proceso</th>
-                    <th>Nivel</th>
-                    <th>Peso</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for r in respuestas %}
-                    {% if r.pregunta.grupo == grupo %}
-                    <tr>
-                      <td>{{ r.pregunta.categoria }}</td>
-                      <td>
-                        {{ r.pregunta.area }}<br>
-                        <small class="text-muted">{{ r.pregunta.texto|truncatechars:50 }}</small>
-                      </td>
-                      <td>{{ r.valoracion }}</td>
-                      <td>{{ r.pregunta.peso_area }}</td>
-                    </tr>
-                    {% endif %}
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-        {% endfor %}
+    <!-- 2) Tabla jerárquica abajo -->
+    <div class="col-12">
+      <div class="table-responsive">
+        <table class="table table-bordered align-middle">
+          <thead class="table-light text-center">
+            <tr>
+              <th>Grupo</th>
+              <th>Categoría</th>
+              <th>Nivel<br>Categoría</th>
+              <th>Área de Proceso</th>
+              <th>Nivel<br>Área</th>
+              <th>Peso<br>Área</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+            <tr>
+              {% if r.show_group %}
+                <td rowspan="{{ r.group_rowspan }}">{{ r.grupo }}</td>
+              {% endif %}
+              {% if r.show_category %}
+                <td rowspan="{{ r.category_rowspan }}">{{ r.categoria }}</td>
+                <td rowspan="{{ r.category_rowspan }}" class="text-center">
+                  {{ r.nivel_categoria }}
+                </td>
+              {% endif %}
+              <td>{{ r.area }}</td>
+              <td class="text-center">{{ r.nivel_area }}</td>
+              <td class="text-center">
+                {# Peso Área estático según Tabla 177 #}
+                {% if r.area == "Principios relacionados con los datos" %}100
+                {% elif r.area == "Metas, objetivos y estrategias de la GD" %}60
+                {% elif r.area == "Necesidades de información" %}40
+                {% elif r.area == "Órganos y actores de GD" %}70
+                {% elif r.area == "Modelo organizativo de la GD" %}30
+                {% elif r.area == "Roles, responsabilidades y derechos de decisión" %}40
+                {% elif r.area == "Función de gobernanza" %}30
+                {% elif r.area == "Políticas y estándares" %}30
+                {% elif r.area == "Glosario de negocio" %}25
+                {% elif r.area == "Catálogo de datos" %}25
+                {% elif r.area == "Gestión de Metadatos" %}30
+                {% elif r.area == "Plan de calidad de los datos" %}100
+                {% elif r.area == "Seguridad, Privacidad y Riesgos de los Datos" %}100
+                {% elif r.area == "Planificación y diseño de la arquitectura de datos" %}50
+                {% elif r.area == "Actividades del CVD" %}50
+                {% else %}0
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
 </div>
-{% endblock content %}
+{% endblock %}
 
 {% block script %}
   {{ radar_labels|json_script:"gdLabels" }}
@@ -77,16 +80,14 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
   <script>
-    // Radar Chart
-    const labels = JSON.parse(document.getElementById('gdLabels').textContent);
-    const values = JSON.parse(document.getElementById('gdValues').textContent);
-    new Chart(document.getElementById('radarChartGD'), {
+    const ctx = document.getElementById('radarChartGD').getContext('2d');
+    new Chart(ctx, {
       type: 'radar',
       data: {
-        labels,
+        labels: JSON.parse(document.getElementById('gdLabels').textContent),
         datasets: [{
-          label: 'Porcentaje GD',
-          data: values,
+          label: 'Cobertura (%)',
+          data: JSON.parse(document.getElementById('gdValues').textContent),
           fill: true,
           backgroundColor: 'rgba(54,162,235,0.2)',
           borderColor: 'rgb(54,162,235)',
@@ -94,6 +95,7 @@
         }]
       },
       options: {
+        maintainAspectRatio: false,
         scales: {
           r: {
             beginAtZero: true,
@@ -105,5 +107,4 @@
       }
     });
   </script>
-{% endblock script %}
-
+{% endblock %}

@@ -1,6 +1,6 @@
 from datetime import date
 from django.contrib.auth.models import User 
-from collections import defaultdict
+from collections import Counter, defaultdict, OrderedDict
 from django.db.models import Count, Max
 from django.db.models.functions import TruncDate
 from django.forms import inlineformset_factory
@@ -10,7 +10,7 @@ from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import PasswordChangeForm
 from django.urls import reverse
-
+from django.db import models
 from .models import (
     Perfil, Pregunta, OpcionPregunta,
     Respuesta, Encuesta,
@@ -120,7 +120,7 @@ def formulario_gobernanza(request):
                 )
 
         messages.success(request, "Respuestas guardadas con éxito.")
-        return redirect('formulario_gobernanza')
+        return redirect('respuestas')
 
     # --- 5) GET: renderizamos plantilla pasando 'preguntas', cada una con 'lista_opciones' ---
     return render(request, 'core/gobernanza.html', {
@@ -443,17 +443,19 @@ def mipassword(request):
 
     return render(request, 'core/mipassword.html', {'form': form})
 
+@login_required
 @user_passes_test(es_superusuario_activo)
 def mantenedor_usuarios(request, accion, id):
     usuario = get_object_or_404(User, id=id) if int(id) > 0 else None
     perfil = getattr(usuario, 'perfil', None)
 
+    # Manejo de POST (crear/actualizar)
     if request.method == 'POST':
         form_usuario = UsuarioForm(request.POST, instance=usuario)
-        form_perfil = PerfilForm(request.POST, request.FILES, instance=perfil)
+        form_perfil  = PerfilForm(request.POST, request.FILES, instance=perfil)
         if form_usuario.is_valid() and form_perfil.is_valid():
             usuario = form_usuario.save()
-            perfil = form_perfil.save(commit=False)
+            perfil  = form_perfil.save(commit=False)
             perfil.usuario_id = usuario.id
             perfil.save()
             messages.success(request, f'Usuario {usuario.username} guardado.')
@@ -462,19 +464,25 @@ def mantenedor_usuarios(request, accion, id):
             messages.error(request, 'No fue posible guardar el usuario')
             show_form_errors(request, [form_usuario, form_perfil])
 
+    # Eliminar
     elif request.method == 'GET' and accion == 'eliminar':
         eliminado, mensaje = eliminar_registro(User, id)
         messages.success(request, mensaje)
         return redirect('mantenedor_usuarios', accion='crear', id=0)
+
     else:
         form_usuario = UsuarioForm(instance=usuario)
-        form_perfil = PerfilForm(instance=perfil)
+        form_perfil  = PerfilForm(instance=perfil)
+
+    # **Aquí: recogemos todos los usuarios para listarlos abajo**
+    usuarios = User.objects.all().select_related('perfil')
 
     return render(request, 'core/mantenedor_usuarios.html', {
         'form_usuario': form_usuario,
-        'form_perfil': form_perfil,
-        'accion': accion,
-        'usuario': usuario,
+        'form_perfil':   form_perfil,
+        'accion':        accion,
+        'usuario':       usuario,
+        'usuarios':      usuarios,   # <-- nuevo
     })
 
 @login_required
@@ -543,59 +551,68 @@ def mantenedor_preguntas(request, accion, id):
     
 @login_required
 @user_passes_test(es_superusuario_activo)
-def mantenedor_preguntas_gd_gd(request, accion='listar', id=0):
-    """
-    CRUD para PreguntaGD:
-      - 'listar': muestra todas las preguntas GD
-      - 'crear':  crea una nueva
-      - 'actualizar': edita existente
-      - 'eliminar': borra existente
-    """
-    # Validar acción
-    if accion not in ('listar', 'crear', 'actualizar', 'eliminar'):
+def mantenedor_preguntas_gd_gd(request, accion=None, id=0):
+    acciones_validas = ('listar', 'crear', 'actualizar', 'eliminar')
+
+    if not accion:
+        return redirect('mantenedor_preguntas_gd', accion='crear', id=0)
+
+    if accion not in acciones_validas:
         messages.error(request, 'Acción inválida.')
-        return redirect('mantenedor_preguntas_gd')
+        return redirect('mantenedor_preguntas_gd', accion='crear', id=0)
 
-    pregunta = None
-    if id > 0:
-        pregunta = get_object_or_404(PreguntaGD, pk=id)
+    pregunta = get_object_or_404(PreguntaGD, pk=id) if id > 0 else None
 
-    # ELIMINAR
-    if accion == 'eliminar' and pregunta:
-        pregunta.delete()
-        messages.success(request, 'Pregunta GD eliminada correctamente.')
-        return redirect('mantenedor_preguntas_gd')
+    # Eliminar
+    if accion == 'eliminar':
+        if pregunta:
+            pregunta.delete()
+            messages.success(request, 'Pregunta GD eliminada correctamente.')
+        else:
+            messages.error(request, 'Pregunta GD no encontrada para eliminar.')
+        return redirect('mantenedor_preguntas_gd', accion='crear', id=0)
 
-    # CREAR / ACTUALIZAR
+    # Crear/Actualizar
     if accion in ('crear', 'actualizar'):
         if request.method == 'POST':
             form = PreguntaGDForm(request.POST, instance=pregunta)
             if form.is_valid():
-                obj = form.save()
-                msg = 'creada' if accion=='crear' else 'actualizada'
+                nueva_pregunta = form.save(commit=False)
+
+                # Si estamos creando, calculamos el siguiente número:
+                if accion == 'crear':
+                    max_num = PreguntaGD.objects.filter(
+                        grupo=nueva_pregunta.grupo,
+                        categoria=nueva_pregunta.categoria,
+                        area=nueva_pregunta.area
+                    ).aggregate(max_num=models.Max('numero'))['max_num'] or 0
+                    nueva_pregunta.numero = max_num + 1
+                # Si estamos actualizando, no cambiamos el número (lo mantiene)
+                
+                nueva_pregunta.save()
+                msg = 'creada' if accion == 'crear' else 'actualizada'
                 messages.success(request, f'Pregunta GD {msg} correctamente.')
-                return redirect('mantenedor_preguntas_gd', accion='actualizar', id=obj.pk)
+                return redirect('mantenedor_preguntas_gd', accion='actualizar', id=nueva_pregunta.pk)
             else:
                 messages.error(request, 'Corrige los errores del formulario.')
         else:
             form = PreguntaGDForm(instance=pregunta)
 
-        # listar preguntas para mostrar al lado del form
-        preguntas = PreguntaGD.objects.all().order_by('grupo','categoria','area','numero')
+        preguntas = PreguntaGD.objects.all().order_by('grupo', 'categoria', 'area', 'numero')
         return render(request, 'core/mantenedor_preguntas_gd.html', {
-            'form':      form,
-            'pregunta':  pregunta,
+            'form': form,
+            'pregunta': pregunta,
             'preguntas': preguntas,
-            'accion':    accion,
+            'accion': accion,
         })
 
-    # LISTAR (GET en 'listar')
-    preguntas = PreguntaGD.objects.all().order_by('grupo','categoria','area','numero')
+    # Listar
+    preguntas = PreguntaGD.objects.all().order_by('grupo', 'categoria', 'area', 'numero')
     return render(request, 'core/mantenedor_preguntas_gd.html', {
-        'form':      None,
-        'pregunta':  None,
+        'form': None,
+        'pregunta': None,
         'preguntas': preguntas,
-        'accion':    'listar',
+        'accion': 'listar',
     })
 
 @user_passes_test(es_superusuario_activo)
@@ -695,54 +712,194 @@ def zpoblar2_view(request):
 @login_required
 def reporte_gd(request, encuesta_id):
     encuesta = get_object_or_404(EncuestaGD, pk=encuesta_id)
-    # Sólo su autor o el superusuario
     if encuesta.usuario != request.user and not es_superusuario_activo(request.user):
         return redirect('seleccionar_encuesta_gd')
 
-    # 1) Traer todas las respuestas de esa encuesta
-    respuestas = RespuestaGD.objects.filter(encuesta=encuesta).select_related('pregunta')
+    # 1) Cargar y mapear
+    respuestas = list(
+        RespuestaGD.objects
+            .filter(encuesta=encuesta)
+            .select_related('pregunta')
+            .order_by(
+                'pregunta__grupo',
+                'pregunta__categoria',
+                'pregunta__area',
+                'pregunta__numero'
+            )
+    )
+    valor_map = {1: 0.0, 2: 25.0, 3: 50.0, 4: 100.0}
+    nivel_map = {'inicial': 1, 'gestionado': 2, 'definido': 3, 'medido': 4, 'optimo': 5}
 
-    # 2) Extraer grupos únicos para el dropdown/accordion
-    groups = sorted({ r.pregunta.grupo for r in respuestas })
-
-    # 3) Cálculo por “dimensión” = grupo
-    scores = defaultdict(lambda: {'acum': 0.0, 'peso_total': 0.0})
+    # 2) Agrupar por área y guardar código para pesos fijos
+    areas = {}
     for r in respuestas:
-        grp     = r.pregunta.grupo
-        peso    = float(r.pregunta.peso_area)
-        scores[grp]['acum']       += peso
-        scores[grp]['peso_total'] += peso
+        grp, cat, area = r.pregunta.grupo, r.pregunta.categoria, r.pregunta.area
+        cod = r.pregunta.codigo
+        key = (grp, cat, area)
+        areas.setdefault(key, {
+            'grupo': grp,
+            'categoria': cat,
+            'area': area,
+            'codigo': cod,
+            'respuestas': []
+        })['respuestas'].append(r)
 
-    dimension_scores = {}
-    for grp, v in scores.items():
-        acum      = v['acum']
-        peso_tot  = v['peso_total']
-        pct       = (acum / peso_tot * 100) if peso_tot else 0
-        dimension_scores[grp] = {
-            'score':     acum,
-            'max_score': peso_tot,
-            'pct':       pct,
+    # 3) Calcular nivel de cada área (Ecuaciones 1–3)
+    for data in areas.values():
+        counts = Counter()
+        sums = defaultdict(float)
+        for r in data['respuestas']:
+            raw = r.pregunta.nivel
+            n = nivel_map.get(raw, int(raw) if str(raw).isdigit() else 1)
+            n = max(1, min(n, 5))
+            p = valor_map.get(r.valoracion, 0.0)
+            counts[n] += 1
+            sums[n] += p
+        Vn = {i: (sums[i] / counts[i] if counts[i] else 0.0) for i in range(1, 6)}
+        data['nivel_area'] = sum(Vn.values()) / 100.0
+
+    # 4) Agrupar en categorías (solo para calcular N_categoria)
+    categorias = defaultdict(list)
+    for (grp, cat, _), d in areas.items():
+        categorias[(grp, cat)].append(d)
+
+    # 5) Calcular nivel de cada categoría (Ecuación 4 simplificada)
+    category_results = {}
+    for (grp, cat), area_list in categorias.items():
+        total = sum(a['nivel_area'] for a in area_list)
+        Ne = (total / len(area_list)) if area_list else 0
+        category_results[(grp, cat)] = {
+            'N_categoria': round(Ne, 2),
+            'areas': area_list
         }
 
-    # 4) Totales globales
-    total_score     = sum(d['score']     for d in dimension_scores.values())
-    total_max_score = sum(d['max_score'] for d in dimension_scores.values())
-    total_pct       = (total_score / total_max_score * 100) if total_max_score else 0
+    # 6) Pesos fijos por código según Tabla 177
+    PESOS_FIJOS_POR_COD = {
+        '1.1.1': 100,
+        '2.1.1': 60, '2.1.2': 40,
+        '2.2.1': 70, '2.2.2': 30,
+        '2.3.1': 40, '2.3.2': 30, '2.3.3': 30,
+        '3.1.1': 25, '3.1.2': 25, '3.1.3': 30,
+        '3.2.1': 100,
+        '3.3.1': 100,
+        '3.4.1': 50, '3.4.2': 50,
+    }
 
-    # 5) Datos para radar chart
-    radar_labels    = list(dimension_scores.keys())
-    radar_user_data = [round(d['pct'], 1) for d in dimension_scores.values()]
-    radar_max_data  = [100] * len(radar_labels)
+    # 7) Aplanar en filas y asignar peso estático
+    rows = []
+    for (grp, cat), cat_data in category_results.items():
+        nivel_cat = cat_data['N_categoria']
+        for a in cat_data['areas']:
+            peso = PESOS_FIJOS_POR_COD.get(str(a['codigo']), 0)
+            rows.append({
+                'grupo': grp,
+                'categoria': cat,
+                'nivel_categoria': nivel_cat,
+                'area': a['area'],
+                'nivel_area': round(a['nivel_area'], 2),
+                'peso_area': peso,
+            })
+
+    # 8) Preparar rowspans para tabla
+    group_counts = Counter(r['grupo'] for r in rows)
+    cat_counts = Counter((r['grupo'], r['categoria']) for r in rows)
+    seen_g, seen_c = set(), set()
+    for r in rows:
+        g, c = r['grupo'], r['categoria']
+        if g not in seen_g:
+            r['show_group'] = True
+            r['group_rowspan'] = group_counts[g]
+            seen_g.add(g)
+        else:
+            r['show_group'] = False
+        if (g, c) not in seen_c:
+            r['show_category'] = True
+            r['category_rowspan'] = cat_counts[(g, c)]
+            seen_c.add((g, c))
+        else:
+            r['show_category'] = False
+
+    # 9) Radar: un punto por cada área de proceso
+    area_items = list(areas.items())
+    radar_labels = [
+        f"{area}"
+        for (grp, cat, area), _ in area_items
+    ]
+    radar_user_data = [
+        round(data['nivel_area'] / 5 * 100, 1)
+        for _, data in area_items
+    ]
 
     return render(request, 'core/reporte_gd.html', {
-        'encuesta':          encuesta,
-        'respuestas':        respuestas,
-        'groups':            groups,
-        'dimension_scores':  dimension_scores,
-        'total_score':       total_score,
-        'total_max_score':   total_max_score,
-        'total_pct':         total_pct,
-        'radar_labels':      radar_labels,
-        'radar_user_data':   radar_user_data,
-        'radar_max_data':    radar_max_data,
+        'encuesta': encuesta,
+        'rows': rows,
+        'radar_labels': radar_labels,
+        'radar_user_data': radar_user_data,
+    })
+    
+
+
+@login_required
+@user_passes_test(es_superusuario_activo)
+def mantenedor_respuestas_gd(request, accion='listar', id=0):
+    """
+    CRUD para el mantenedor de respuestas GD:
+     - 'listar': usuarios con al menos una EncuestaGD
+     - 'ver':   redirige a reporte_gd (GET: encuesta_id)
+     - 'eliminar': borra TODAS las encuestas y respuestas de un usuario
+     - 'eliminar_encuesta': borra una sola encuesta y sus respuestas
+    """
+    usuario = get_object_or_404(User, pk=id) if int(id) > 0 else None
+
+    # Ver una encuesta (redirige a reporte_gd)
+    if accion == 'ver' and usuario:
+        encuesta_id = request.GET.get('encuesta_id')
+        if encuesta_id:
+            return redirect(reverse('reporte_gd', args=[encuesta_id]))
+        messages.error(request, "No se especificó encuesta para ver.")
+        return redirect('mantenedor_respuestas_gd')
+
+    # Eliminar todas las respuestas GD de un usuario
+    if accion == 'eliminar' and usuario:
+        RespuestaGD.objects.filter(encuesta__usuario=usuario).delete()
+        EncuestaGD.objects.filter(usuario=usuario).delete()
+        messages.success(request, f'Todas las encuestas GD de "{usuario.username}" han sido eliminadas.')
+        return redirect('mantenedor_respuestas_gd')
+
+    # Eliminar una sola encuesta GD
+    if accion == 'eliminar_encuesta' and usuario:
+        encuesta_id = request.GET.get('encuesta_id')
+        if encuesta_id:
+            encuesta = get_object_or_404(EncuestaGD, pk=encuesta_id, usuario=usuario)
+            RespuestaGD.objects.filter(encuesta=encuesta).delete()
+            encuesta.delete()
+            messages.success(request, f'Encuesta GD #{encuesta_id} de "{usuario.username}" eliminada correctamente.')
+        else:
+            messages.error(request, "No se especificó encuesta para eliminar.")
+        return redirect('mantenedor_respuestas_gd')
+
+    # Listar usuarios que tienen al menos una EncuestaGD
+    users_with_surveys = (
+        User.objects
+            .filter(encuestagd__isnull=False)
+            .distinct()
+            .select_related('perfil')
+    )
+
+    user_data = []
+    for u in users_with_surveys:
+        encs = EncuestaGD.objects.filter(usuario=u).order_by('-fecha')
+        surveys = [
+            {'id': e.id, 'date': e.fecha.date().isoformat()}
+            for e in encs
+        ]
+        user_data.append({
+            'user':    u,
+            'surveys': surveys
+        })
+
+    return render(request, 'core/mantenedor_respuestas_gd.html', {
+        'user_data': user_data,
+        'accion':    accion,
+        'usuario':   usuario,
     })

@@ -8,7 +8,7 @@
 <div class="container border border-dark p-4">
   <h2 class="text-center">Mantenedor de Preguntas GD</h2>
 
-  {# — Botón para repoblar (superuser) — #}
+  {# ------ BOTÓN PARA POBLAR BD GD (solo superusuario) ------ #}
   {% if user.is_superuser and user.is_active %}
     <div class="text-end mb-3">
       <a href="{% url 'zpoblar2' %}"
@@ -19,76 +19,77 @@
     </div>
   {% endif %}
 
-  {# — Formulario de crear/editar — #}
-  <form method="post" id="pregunta-gd-form">
-    {% csrf_token %}
-
-    {# Código: sólo lo mostramos en 'crear'; en 'actualizar' lo ocultamos #}
-    {% if accion == 'crear' %}
-      <div class="mb-3">
-        {{ form.codigo.label_tag }}
-        {{ form.codigo }}
-        {{ form.codigo.errors }}
-      </div>
-    {% else %}
-      {{ form.codigo.as_hidden }}
-    {% endif %}
-
-    <div class="mb-3">
-      {{ form.grupo.label_tag }}
-      {{ form.grupo }}
-      {{ form.grupo.errors }}
-    </div>
-    <div class="mb-3">
-      {{ form.categoria.label_tag }}
-      {{ form.categoria }}
-      {{ form.categoria.errors }}
-    </div>
-    <div class="mb-3">
-      {{ form.area.label_tag }}
-      {{ form.area }}
-      {{ form.area.errors }}
-    </div>
-    <div class="mb-3">
-      {{ form.numero.label_tag }}
-      {{ form.numero }}
-      {{ form.numero.errors }}
-    </div>
-    <div class="mb-3">
-      {{ form.texto.label_tag }}
-      {{ form.texto }}
-      {{ form.texto.errors }}
-    </div>
-    <div class="mb-3">
-      {{ form.peso_area.label_tag }}
-      {{ form.peso_area }}
-      {{ form.peso_area.errors }}
-    </div>
-    <div class="mb-3">
-      {{ form.nivel.label_tag }}
-      {{ form.nivel }}
-      {{ form.nivel.errors }}
-    </div>
-
-    <div class="mt-3 text-center">
-      <button type="submit" class="btn btn-primary">Guardar</button>
-      <a href="{% url 'mantenedor_preguntas_gd' %}" class="btn btn-secondary">Cancelar</a>
-      {% if pregunta %}
-        <a href="{% url 'mantenedor_preguntas_gd' 'eliminar' pregunta.pk %}"
-           class="btn btn-danger"
-           onclick="return confirm('¿Eliminar esta pregunta GD?');">
-          Eliminar
-        </a>
+  {% if form %}
+    <form method="post" id="pregunta-gd-form">
+      {% csrf_token %}
+      {% if accion == 'crear' %}
+        <div class="mb-3">
+          {{ form.codigo.label_tag }}
+          {{ form.codigo }}
+          {{ form.codigo.errors }}
+        </div>
+      {% else %}
+        {{ form.codigo.as_hidden }}
       {% endif %}
-      <a href="{% url 'mantenedor_preguntas_gd' 'crear' 0 %}" class="btn btn-success">Nueva</a>
-    </div>
-  </form>
+      <div class="mb-3">
+        {{ form.grupo.label_tag }}
+        {{ form.grupo }}
+        {{ form.grupo.errors }}
+      </div>
+      <div class="mb-3">
+        {{ form.categoria.label_tag }}
+        {{ form.categoria }}
+        {{ form.categoria.errors }}
+      </div>
+      <div class="mb-3">
+        {{ form.area.label_tag }}
+        {{ form.area }}
+        {{ form.area.errors }}
+      </div>
+      <div class="mb-3">
+        {{ form.texto.label_tag }}
+        {{ form.texto }}
+        {{ form.texto.errors }}
+      </div>
+      <div class="mb-3">
+        {{ form.peso_area.label_tag }}
+        {{ form.peso_area }}
+        {{ form.peso_area.errors }}
+      </div>
+      <div class="mb-3">
+        {{ form.nivel.label_tag }}
+        {{ form.nivel }}
+        {{ form.nivel.errors }}
+      </div>
+
+      <div class="mt-3 text-center">
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <a href="{% url 'mantenedor_preguntas_gd' 'crear' 0 %}" class="btn btn-success">Nueva</a>
+        {% if pregunta %}
+          <a href="{% url 'mantenedor_preguntas_gd' 'eliminar' pregunta.pk %}"
+             class="btn btn-danger"
+             onclick="return confirm('¿Eliminar esta pregunta GD?');">
+            Eliminar
+          </a>
+        {% endif %}
+        <a href="{% url 'mantenedor_preguntas_gd' %}" class="btn btn-secondary">Cancelar</a>
+      </div>
+    </form>
+  {% endif %}
 </div>
 
-{# — Tabla de todas las preguntas — #}
 {% if preguntas %}
-  <div class="container mt-4 border border-dark p-3">
-    <table class="table table-hover">
+  <div class="container mt-4">
+
+    {# Buscador en vivo #}
+    <div class="mb-3">
+      <input type="text"
+             id="buscadorPreguntasGD"
+             class="form-control"
+             placeholder="Buscar pregunta...">
+    </div>
+
+    <table class="table table-hover" id="tablaPreguntasGD">
       <thead class="table-light">
         <tr>
           <th>PK</th>
@@ -96,7 +97,8 @@
           <th>Grupo</th>
           <th>Categoría</th>
           <th>Área</th>
-          <th>Número</th>
+          <th>Texto</th>
+          <th>Peso Área</th>
           <th>Nivel</th>
           <th>Acciones</th>
         </tr>
@@ -109,7 +111,8 @@
           <td>{{ p.grupo }}</td>
           <td>{{ p.categoria }}</td>
           <td>{{ p.area }}</td>
-          <td>{{ p.numero }}</td>
+          <td>{{ p.texto|truncatechars:50 }}</td>
+          <td>{{ p.peso_area }}</td>
           <td>{{ p.get_nivel_display }}</td>
           <td>
             <a href="{% url 'mantenedor_preguntas_gd' 'actualizar' p.pk %}"
@@ -126,4 +129,26 @@
     </table>
   </div>
 {% endif %}
+{% endblock %}
+
+{% block script %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Filtro en vivo
+  const input = document.getElementById('buscadorPreguntasGD');
+  if (input) {
+    const tbody = document
+      .getElementById('tablaPreguntasGD')
+      .querySelector('tbody');
+    input.addEventListener('keyup', () => {
+      const filtro = input.value.toLowerCase();
+      for (let row of tbody.rows) {
+        row.style.display = Array.from(row.cells)
+          .some(cell => cell.textContent.toLowerCase().includes(filtro))
+          ? '' : 'none';
+      }
+    });
+  }
+});
+</script>
 {% endblock %}

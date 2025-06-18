@@ -1,0 +1,72 @@
+{# templates/core/mantenedor_respuestas_gd.html #}
+{% extends 'core/base.html' %}
+{% block title %}Mantenedor de Respuestas GD{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+  <h2 class="mb-4 text-center">Mantenedor de Respuestas Modelo GD</h2>
+  <table class="table table-hover align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>ID</th>
+        <th>Usuario</th>
+        <th>Empresa</th>
+        <th>Encuestas realizadas</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in user_data %}
+        {% with u=entry.user surveys=entry.surveys %}
+        <tr>
+          <td>{{ u.id }}</td>
+          <td>{{ u.username }}</td>
+          <td>{{ u.perfil.nombre_empresa }}</td>
+          <td>
+            <div class="dropdown">
+              <button class="btn btn-sm btn-secondary dropdown-toggle" type="button"
+                      id="drop{{ u.id }}" data-bs-toggle="dropdown" aria-expanded="false">
+                {{ surveys|length }} encuesta{{ surveys|length|pluralize }}
+              </button>
+              <ul class="dropdown-menu" aria-labelledby="drop{{ u.id }}">
+                {% for s in surveys %}
+                  <li class="d-flex justify-content-between align-items-center px-2 py-1">
+                    <span>{{ s.date }}</span>
+                    <div>
+                      {# Ver reporte GD de esa encuesta #}
+                      <a class="btn btn-sm btn-outline-primary me-1"
+                         href="{% url 'reporte_gd' s.id %}">
+                        Ver
+                      </a>
+                      {# Eliminar solo esa encuesta GD #}
+                      <a class="btn btn-sm btn-outline-danger"
+                         href="{% url 'mantenedor_respuestas_gd' 'eliminar_encuesta' u.id %}?encuesta_id={{ s.id }}"
+                         onclick="return confirm('¿Eliminar la encuesta del {{ s.date }} de {{ u.username }}?');">
+                        Eliminar
+                      </a>
+                    </div>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          </td>
+          <td>
+            {# Botón para eliminar todas las encuestas GD de este usuario #}
+            <a href="{% url 'mantenedor_respuestas_gd' 'eliminar' u.id %}"
+               class="btn btn-sm btn-danger"
+               onclick="return confirm('¿Eliminar todas las encuestas de {{ u.username }}?');">
+              Eliminar todas
+            </a>
+          </td>
+        </tr>
+        {% endwith %}
+      {% empty %}
+        <tr>
+          <td colspan="5" class="text-center">No hay usuarios con encuestas GD.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock content %}
+
