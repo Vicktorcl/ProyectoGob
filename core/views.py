@@ -46,28 +46,31 @@ def es_usuario_anonimo(user):
 # Vistas públicas (anónimos)
 # ------------------------------------------------------------------------------------------------------
 
+
 @user_passes_test(es_usuario_anonimo, login_url='formulario_gobernanza')
 def inicio(request):
-    """Página de inicio: muestra formulario de login o recibe POST para autenticar."""
-    if request.method == "POST":
-        form = IngresarForm(request.POST)
-        if form.is_valid():
-            username = form.cleaned_data['username']
-            password = form.cleaned_data['password']
-            user = authenticate(username=username, password=password)
-            if user and user.is_active:
-                login(request, user)
-                messages.success(request, f'¡Bienvenido(a) {user.first_name} {user.last_name}!')
-                return redirect('formulario_gobernanza')
-            messages.error(request, 'Credenciales incorrectas o cuenta desactivada')
-        else:
-            messages.error(request, 'No se pudo procesar el formulario')
-            show_form_errors(request, [form])
-    else:
-        form = IngresarForm()
+    """
+    GET: muestra el formulario de login.
+    POST: valida campos, luego credenciales; en caso de fallo
+          añade un error inline al form y re-renderiza.
+    """
+    # Instancia el form con POST o vacío
+    form = IngresarForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        username = form.cleaned_data['username']
+        password = form.cleaned_data['password']
+        user = authenticate(username=username, password=password)
+
+        if user and user.is_active:
+            login(request, user)
+            messages.success(request, f'¡Bienvenido(a) {user.first_name} {user.last_name}!')
+            return redirect('formulario_gobernanza')
+
+        # Credenciales inválidas → error non-field
+        form.add_error(None, 'Usuario o contraseña incorrectos o cuenta desactivada')
 
     return render(request, 'core/inicio.html', {'form': form})
-
 
 @login_required
 def formulario_gobernanza(request):
@@ -176,26 +179,32 @@ def ingresar(request):
 
 @user_passes_test(es_usuario_anonimo, login_url='inicio')
 def registro(request):
+    """
+    GET: muestra formularios.
+    POST: si ambos forms son válidos, guarda y redirige.
+          Si no, RE-RENDERIZA con form.errors para que el template los muestre inline.
+    """
     if request.method == 'POST':
         form_usuario = RegistroUsuarioForm(request.POST)
-        form_perfil = RegistroPerfilForm(request.POST, request.FILES)
+        form_perfil  = RegistroPerfilForm(request.POST, request.FILES)
+
         if form_usuario.is_valid() and form_perfil.is_valid():
-            usuario = form_usuario.save()
+            user = form_usuario.save()
             perfil = form_perfil.save(commit=False)
-            perfil.usuario_id = usuario.id
+            perfil.usuario = user
             perfil.save()
-            messages.success(request, f'Cuenta "{usuario.username}" creada exitosamente.')
+            messages.success(request, f'Cuenta "{user.username}" creada exitosamente.')
             return redirect('ingresar')
-        else:
-            messages.error(request, 'Error al crear la cuenta')
-            show_form_errors(request, [form_usuario, form_perfil])
+        # ¡NO redirigir ni usar messages.error aquí!
+        # Deja que form_usuario.errors y form_perfil.errors se conserven.
+
     else:
         form_usuario = RegistroUsuarioForm()
-        form_perfil = RegistroPerfilForm()
+        form_perfil  = RegistroPerfilForm()
 
     return render(request, 'core/registro.html', {
         'form_usuario': form_usuario,
-        'form_perfil': form_perfil,
+        'form_perfil':   form_perfil,
     })
 
 # ------------------------------------------------------------------------------------------------------

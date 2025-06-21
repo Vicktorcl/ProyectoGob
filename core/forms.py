@@ -1,10 +1,37 @@
 from django import forms
 from django.forms.models import inlineformset_factory
 from django.forms import ModelForm, Form
+from django.core.validators import RegexValidator
+from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
-from django.contrib.auth.forms import UserCreationForm
-from .models import Perfil, Pregunta, PreguntaGD, RespuestaGD, OpcionPregunta
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from .models import Perfil, Pregunta, PreguntaGD, RespuestaGD, OpcionPregunta, Perfil
 
+
+class IngresarForm(Form):
+    username = forms.CharField(
+        label='Usuario',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Tu usuario',
+            'autofocus': True,
+        }),
+        error_messages={'required': 'El nombre de usuario es obligatorio.'}
+    )
+    password = forms.CharField(
+        label='Contraseña',
+        strip=False,
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Tu contraseña',
+        }),
+        error_messages={'required': 'La contraseña es obligatoria.'}
+    )
+
+    error_messages = {
+        'invalid_login': 'Usuario o contraseña incorrectos.',
+        'inactive': 'Esta cuenta está desactivada.',
+    }
 
 class PreguntaGDForm(forms.ModelForm):
     class Meta:
@@ -37,13 +64,6 @@ class PreguntaGDForm(forms.ModelForm):
             'nivel':     'Nivel de madurez',
         }
         
-# Formulario para ingresar un nuevo usuario
-class IngresarForm(Form):
-    username = forms.CharField(widget=forms.TextInput(), label="Nombre de usuario")
-    password = forms.CharField(widget=forms.PasswordInput(), label="Contraseña")
-    class Meta:
-        fields = ['username', 'password']
-        
 
 class GobernanzaForm(forms.Form):
     def __init__(self, *args, **kwargs):
@@ -74,14 +94,39 @@ class GobernanzaForm(forms.Form):
 
 # Formulario para registro de nuevo usuario
 class RegistroUsuarioForm(UserCreationForm):
+    username = forms.CharField(
+        label='Nombre de usuario',
+        widget=forms.TextInput(attrs={'class':'form-control','placeholder':'Usuario'}),
+        error_messages={'required':'El nombre de usuario es obligatorio.'}
+    )
+    email = forms.EmailField(
+        label='Correo electrónico',
+        widget=forms.EmailInput(attrs={'class':'form-control','placeholder':'tu@ejemplo.com'}),
+        error_messages={'required':'El correo es obligatorio.','invalid':'Correo inválido.'}
+    )
+    password1 = forms.CharField(
+        label='Contraseña',
+        strip=False,
+        widget=forms.PasswordInput(attrs={'class':'form-control','placeholder':'Contraseña'}),
+        help_text='Mínimo 8 caracteres.',
+        error_messages={'required':'La contraseña es obligatoria.'}
+    )
+    password2 = forms.CharField(
+        label='Confirmar contraseña',
+        strip=False,
+        widget=forms.PasswordInput(attrs={'class':'form-control','placeholder':'Repite la contraseña'}),
+        error_messages={'required':'Confirma la contraseña.'}
+    )
+
     class Meta:
         model = User
-        fields = ['username', 'email', 'password1' , 'password2']
-        labels = {
-            'username': 'Nombre de usuario',
-            'email': 'Correo de contacto',
-            'password2': 'Confirme su contraseña'
-        }
+        fields = ['username','email','password1','password2']
+
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        if User.objects.filter(email=email).exists():
+            raise ValidationError('Este correo ya está registrado.')
+        return email
 
 # Formulario para crear pregunta
 class PreguntaForm(ModelForm):
@@ -120,13 +165,46 @@ OpcionFormSet = inlineformset_factory(
     can_delete=True
 )
 
-
-
 # Formulario para registro de nuevo perfil (empresa)
-class RegistroPerfilForm(ModelForm):
+class RegistroPerfilForm(forms.ModelForm):
+    rut = forms.CharField(
+        label='RUT',
+        max_length=12,
+        validators=[
+            RegexValidator(
+                regex=r'^\d{1,2}\.?\d{3}\.?\d{3}-[\dkK]$',
+                message='Formato inválido. Ej: 12.345.678-5'
+            )
+        ],
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': '12.345.678-5',
+            'required': True,
+        }),
+        error_messages={'required': 'El RUT es obligatorio.'},
+    )
+    nombre_empresa = forms.CharField(
+        label='Nombre de la empresa',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Mi Empresa Ltda.',
+            'required': True,
+        }),
+        error_messages={'required': 'El nombre de la empresa es obligatorio.'},
+    )
+
     class Meta:
         model = Perfil
         fields = ['rut', 'nombre_empresa']
+
+    def clean_rut(self):
+        rut = self.cleaned_data['rut']
+        # (Opcional) validación de dígito verificador:
+        num, dv = rut.split('-')
+        num = num.replace('.','')
+        # aquí podrías implementar el algoritmo del DV
+        # si falla, raise ValidationError('DV no corresponde')
+        return rut
 
 # Formulario para editar datos de usuario
 class UsuarioForm(ModelForm):

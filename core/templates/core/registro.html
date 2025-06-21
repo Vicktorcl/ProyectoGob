@@ -1,68 +1,142 @@
 {% extends 'core/base.html' %}
 {% load static %}
-{% load custom_filters %}
 
 {% block content %}
+<style>
+  /* Anula los iconos de validación de Bootstrap (rojo/verde) */
+  .form-control:invalid,
+  .form-control:valid,
+  .is-invalid,
+  .is-valid {
+    background-image: none !important;
+    box-shadow: none !important;
+  }
+  /* También quita pseudo-elementos WebKit si los hubiese */
+  input.form-control::-webkit-search-decoration,
+  input.form-control::-webkit-search-cancel-button,
+  input.form-control::-webkit-search-results-button,
+  input.form-control::-webkit-search-results-decoration {
+    display: none !important;
+  }
+</style>
 
+<div class="container border border-dark p-4" style="max-width:800px; margin:0 auto;">
+  <h2 class="text-center mb-4">Registro de Usuario</h2>
 
-<div class="container border border-dark p-4">
-<h2 class="text-center">Registro</h2>
-  <form id="form" method="POST" enctype="multipart/form-data">
-
+  <form method="post" enctype="multipart/form-data" novalidate>
     {% csrf_token %}
 
-    <div class="">
+    <div class="row">
+      {# — Campos de Usuario (lado izquierdo) — #}
+      <div class="col-md-6">
+        {# Username #}
+        <div class="mb-3 text-start">
+          <label for="id_username" class="form-label">Usuario</label>
+          <input
+            type="text"
+            name="username"
+            id="id_username"
+            class="form-control {% if form_usuario.username.errors %}is-invalid{% endif %}"
+            placeholder="Tu usuario"
+            value="{{ form_usuario.username.value|default_if_none:'' }}"
+            required
+          >
+          {% for err in form_usuario.username.errors %}
+            <div class="invalid-feedback">{{ err }}</div>
+          {% endfor %}
+        </div>
 
-      <!-- AREA DE DATOS BASICOS: username, nombre, apellidos, correo y contraseñas -->
-      <div class="row">
+        {# Email #}
+        <div class="mb-3 text-start">
+          <label for="id_email" class="form-label">Correo electrónico</label>
+          <input
+            type="email"
+            name="email"
+            id="id_email"
+            class="form-control {% if form_usuario.email.errors %}is-invalid{% endif %}"
+            placeholder="tu@ejemplo.com"
+            value="{{ form_usuario.email.value|default_if_none:'' }}"
+            required
+          >
+          {% for err in form_usuario.email.errors %}
+            <div class="invalid-feedback">{{ err }}</div>
+          {% endfor %}
+        </div>
 
-        
+        {# Contraseña #}
+        <div class="mb-3 text-start">
+          <label for="id_password1" class="form-label">Contraseña</label>
+          <input
+            type="password"
+            name="password1"
+            id="id_password1"
+            class="form-control {% if form_usuario.password1.errors %}is-invalid{% endif %}"
+            placeholder="Contraseña"
+            required
+          >
+          {% for err in form_usuario.password1.errors %}
+            <div class="invalid-feedback">{{ err }}</div>
+          {% endfor %}
+        </div>
 
-        {{ form_perfil|as_bootstrap_form }}
-
-        {{form_usuario|as_bootstrap_form:'help_text_visible=False' }}
-
-
-        
-      <!-- AREA DE DATOS DE PERFIL: rut, dirección y subscrito (VER COMENTARIO "CHECKBOX SUBSCRITO" en script.js)  -->
-        
-
-      </div>
-
-      <!-- AREA DE IMAGEN DE PERFIL -->
-      <div class="col-sm-12 col-md-3 text-center">
-        <div class="row">
-          <!-- AREA DE CUADRO DE IMAGEN: Muestra la Imagen de perfil -->
-          
+        {# Confirmar Contraseña #}
+        <div class="mb-3 text-start">
+          <label for="id_password2" class="form-label">Confirmar contraseña</label>
+          <input
+            type="password"
+            name="password2"
+            id="id_password2"
+            class="form-control {% if form_usuario.password2.errors %}is-invalid{% endif %}"
+            placeholder="Repite la contraseña"
+            required
+          >
+          {% for err in form_usuario.password2.errors %}
+            <div class="invalid-feedback">{{ err }}</div>
+          {% endfor %}
         </div>
       </div>
 
+      {# — Campos de Perfil (lado derecho) — #}
+      <div class="col-md-6">
+        {# RUT #}
+        <div class="mb-3 text-start">
+          <label for="id_rut" class="form-label">RUT</label>
+          <input
+            type="text"
+            name="rut"
+            id="id_rut"
+            class="form-control {% if form_perfil.rut.errors %}is-invalid{% endif %}"
+            placeholder="12.345.678-5"
+            value="{{ form_perfil.rut.value|default_if_none:'' }}"
+            required
+          >
+          {% for err in form_perfil.rut.errors %}
+            <div class="invalid-feedback">{{ err }}</div>
+          {% endfor %}
+        </div>
+
+        {# Nombre Empresa #}
+        <div class="mb-3 text-start">
+          <label for="id_nombre_empresa" class="form-label">Nombre de la empresa</label>
+          <input
+            type="text"
+            name="nombre_empresa"
+            id="id_nombre_empresa"
+            class="form-control {% if form_perfil.nombre_empresa.errors %}is-invalid{% endif %}"
+            placeholder="Mi Empresa Ltda."
+            value="{{ form_perfil.nombre_empresa.value|default_if_none:'' }}"
+            required
+          >
+          {% for err in form_perfil.nombre_empresa.errors %}
+            <div class="invalid-feedback">{{ err }}</div>
+          {% endfor %}
+        </div>
+      </div>
     </div>
 
-    <!-- AREA DE BOTONES -->
-    <div class="mt-2 mb-3 text-center">
-      
-      <button type="submit" class="btn btn-primary"> Registrarme </button>
-      
-      <!-- Boton para "Limpiar formulario" (VER COMENTARIO "BOTON LIMPIAR FORMULARIO" en script.js) -->
-      <button type="reset" id="limpiar_formulario" class="btn btn-success"> Limpiar </button>
-      
-      <!-- AREA DE BOTON DE SELECCIONAR IMAGEN: Reemplaza el botón "Seleccionar archivo" por otro con Bootstrap (VER COMENTARIO "BOTON IMAGEN" en script.js) -->
-      
-      
-      <!-- Botón para "Crear usuario de prueba" (VER COMENTARIO "CREAR USUARIO DE PRUEBA" en registrarme.js) -->
-      {% comment %} <button id="crear_usuario_prueba" class="btn btn-primary"> Crear usuario de prueba </button> {% endcomment %}
-
+    <div class="d-grid gap-2 mt-4">
+      <button type="submit" class="btn btn-primary">Registrarme</button>
     </div>
-  </div>
   </form>
 </div>
-
-<br>
-<br>
-<br>
 {% endblock content %}
-
-{% block script %}
-  <script src="{% static 'core/js/validador_registro.js' %}"></script>
-{% endblock script %}
