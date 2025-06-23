@@ -1,83 +1,69 @@
-{% extends 'core/base.html' %}
-{% load static %}
+{% extends "core/base.html" %}
+{% load custom_filters %}
+
+{% block title %}Sobre Nosotros – GobernanzaOnline{% endblock %}
 
 {% block content %}
-  
+<div class="container">
+  <h1 class="mb-4 text-center">Acerca de GobernanzaOnline</h1>
 
-<div class="container-fluid">
-  <h1>
-      NOSOTROS
-  </h1>
-  <br>
-  <p>
-    ¡Hey, hola! ¡Bienvenidos a Game Haven, donde la diversión es nuestra especialidad y los juegos son nuestra droga! Soy el encargado de este paraíso digital, donde cada clic es una oportunidad para sumergirse en mundos llenos de emoción y aventura.
-
-    Al entrar en nuestra tienda, te recibirán colores vibrantes y personajes encantadores que te invitarán a explorar. Desde clásicos nostálgicos hasta las últimas novedades, tenemos algo para cada tipo de jugador. ¿Buscas acción frenética? Tenemos juegos que harán latir tu corazón más rápido que un jefe final. ¿Prefieres relajarte con algo más tranquilo? Descubre nuestras opciones que te harán sonreír y desconectar del mundo real.
-   
-    En Fentanyl Games, no solo vendemos juegos, ¡creamos experiencias! Nuestra comunidad es el corazón de todo lo que hacemos. Únete a nuestros eventos, charla con otros jugadores en nuestros foros o simplemente pasa el rato y comparte tus momentos épicos. Porque aquí, todos somos una gran familia unida por nuestra pasión por los videojuegos.
-    
-    Y no te preocupes por los detalles técnicos, estamos aquí para hacer que tu experiencia sea lo más suave posible. Desde la compra hasta la instalación, te guiaremos en cada paso del camino, ¡para que puedas empezar a jugar enseguida!</p>
-
-    Así que adelante, aventureros digitales, ¡explora nuestras estanterías virtuales y descubre un mundo de diversión en Fentanyl Games! ¡Gracias por visitarnos y que tus partidas sean llenas de risas y aventuras!
+  <p class="lead text-center">
+    Nuestra plataforma te ayuda a medir tu madurez de datos a través de dos formularios especializados:
   </p>
-</div>
 
-<br>
-<br>
-
-
-<div class="container-fluid ms-auto">
-  <div class="row">
-      <div class="col ">
-      <div class="card" style="width: 18rem;">
-          <img src="{% static 'core/img/emp1.jpg' %}" style="width: 287px; height: 350px;" class="card-img-top" alt="...">
-          <div class="card-body">
-            <h5 class="card-title">Sebastian Cavieres</h5>
-            <h5 class="card-title">Encargado Legal y de Cumplimientos</h5>
-            <p class="card-text">Encargado de garantizar que la tienda cumpla con todas las regulaciones y leyes pertinentes, así como de gestionar cualquier problema legal que pueda surgir.</p>
-            
-          </div>
+  <div class="row gx-4 gy-4 mb-5">
+    <!-- Carta 1: Cuestionario de Gobernanza Básica -->
+    <div class="col-md-6">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body d-flex flex-column">
+          <h5 class="card-title">Modelo MGDE</h5>
+          <p class="card-text">
+            Serie de preguntas de control fundamental con respuestas Sí/No u opciones predefinidas,
+            para evaluar la cultura y los procesos básicos de datos.
+          </p>
+          <h6 class="mt-3">Lineamientos que seguimos:</h6>
+          <ul>
+            <li><strong>Guía MGDE:</strong> estándares y buenas prácticas nacionales, extraídos de
+              <a href="https://wikiguias.digital.gob.cl/guias/Gu%C3%ADa_MGDE" target="_blank" rel="noopener">
+              Guía MGDE</a>.
+            </li>
+          </ul>
         </div>
       </div>
-      <div class="col ">
-          <div class="card" style="width: 18rem; margin-bottom: 50px;">
-              <img src="{% static 'core/img/p2.jpg' %}" style="width: 287px; height: 350px;"  class="card-img-top" alt="...">
-              <div class="card-body">
-                <h5 class="card-title">Nehemias Azocar</h5>
-                <h5 class="card-title">Especialista en Marketing digital</h5>
-                <p class="card-text">Encargado de promocionar la tienda y sus productos en línea, utilizando estrategias como publicidad en redes sociales, optimización de motores de búsqueda (SEO) y marketing por correo electrónico.</p>
-                
-              </div>
-            </div>
-          </div>
-      <div class="col ">
+    </div>
 
-              <div class="card" style="width: 18rem;">
-                  <img src="{% static 'core/img/emp3.jpg' %}" style="width: 287px; height: 350px;" class="card-img-top" alt="...">
-                  <div class="card-body">
-                    <h5 class="card-title">Víctor Barrientos</h5>
-                    <h5 class="card-title">Gerente Ejecutivo</h5>
-                    <p class="card-text">Encargado de la supervisión y gestión general de la tienda, estableciendo estrategias y tomando decisiones clave.</p>
-                    
-                  </div>
-                </div>
-          </div>
-      <div class="col ">
-
-        <div class="card" style="width: 18rem;">
-          <img src="{% static 'core/img/p4.jpg' %}" style="width: 287px; height: 350px;" class="card-img-top card-img-center" alt="...">
-          <div class="card-body">
-            <h5 class="card-title">Hector Torres</h5>
-            <h5 class="card-title">Especialistas en Atención al Cliente</h5>
-            <p class="card-text">Encargado de brindar soporte y asistencia a los clientes, respondiendo preguntas, resolviendo problemas y gestionando devoluciones.</p>
-          </div>
+    <!-- Carta 2: Evaluación de Madurez de Gobernanza de Datos -->
+    <div class="col-md-6">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body d-flex flex-column">
+          <h5 class="card-title">Modelo 4.0 de Madurez de Datos</h5>
+          <p class="card-text">
+            Formulario avanzado basado en el Data Management Maturity (DMM) Model de CMMI,
+            valorado en niveles de 1 a 5 para cada área clave de datos.
+          </p>
+          <h6 class="mt-3">Lineamientos que seguimos:</h6>
+          <ul>
+            <li><strong>Modelo DMM (CMMI Institute):</strong> estructura de 5 niveles de madurez para la gestión de datos.</li>
+            <li><strong>Gobernanza de Datos 4.0:</strong> incorpora prácticas emergentes de automatización y analítica avanzada.</li>
+          </ul>
         </div>
       </div>
+    </div>
   </div>
+
+  <hr class="my-5">
+
+  <div class="row mb-4">
+    <div class="col-md-8 offset-md-2">
+      <h2>Nuestros Objetivos</h2>
+      <ul>
+        <li>Ofrecer una medición clara de la madurez de datos.</li>
+        <li>Comparar resultados entre el enfoque clásico y el avanzado DMM.</li>
+        <li>Proporcionar recomendaciones alineadas con MGDE y mejores prácticas de Gobernanza 4.0.</li>
+      </ul>
+    </div>
+  </div>
+
+
 </div>
-</div>
-
-
-
-    
-{% endblock content %}
+{% endblock %}

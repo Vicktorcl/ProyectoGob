@@ -1,7 +1,7 @@
 from django import forms
 from django.forms.models import inlineformset_factory
 from django.forms import ModelForm, Form
-from django.core.validators import RegexValidator
+from django.core.validators import RegexValidator, MinValueValidator
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
@@ -34,36 +34,82 @@ class IngresarForm(Form):
     }
 
 class PreguntaGDForm(forms.ModelForm):
+    codigo = forms.CharField(
+        label='Código',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: 1.1.1',
+        }),
+        error_messages={'required': 'El código es obligatorio.'},
+    )
+    grupo = forms.CharField(
+        label='Grupo',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: G1 Principios',
+        }),
+        error_messages={'required': 'El grupo es obligatorio.'},
+    )
+    categoria = forms.CharField(
+        label='Categoría',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: C1.1 Principios',
+        }),
+        error_messages={'required': 'La categoría es obligatoria.'},
+    )
+    area = forms.CharField(
+        label='Área',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: Principios relacionados con los datos',
+        }),
+        error_messages={'required': 'El área es obligatoria.'},
+    )
+    texto = forms.CharField(
+        label='Texto de la pregunta',
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Escribe el enunciado aquí',
+        }),
+        error_messages={'required': 'El texto es obligatorio.'},
+    )
+    peso_area = forms.DecimalField(
+        label='Peso del área',
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'placeholder': 'Ej: 2,00',
+        }),
+        error_messages={'required': 'El peso del área es obligatorio.'},
+        min_value=0,
+        max_digits=5,
+        decimal_places=2,
+    )
+    nivel = forms.ChoiceField(
+        label='Nivel de madurez',
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+        }),
+        choices=PreguntaGD.NIVEL_CHOICES,
+        error_messages={'required': 'Selecciona un nivel.'},
+    )
+
     class Meta:
         model = PreguntaGD
-        fields = [
-            'codigo',
-            'grupo',
-            'categoria',
-            'area',
-            'texto',
-            'peso_area',
-            'nivel',
-        ]  # <---- Quitamos 'numero' de aquí
-        widgets = {
-            'codigo':     forms.TextInput(attrs={'class': 'form-control'}),
-            'grupo':      forms.TextInput(attrs={'class': 'form-control'}),
-            'categoria':  forms.TextInput(attrs={'class': 'form-control'}),
-            'area':       forms.TextInput(attrs={'class': 'form-control'}),
-            'texto':      forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'peso_area':  forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'nivel':      forms.Select(attrs={'class': 'form-select'}),
-        }
-        labels = {
-            'codigo':    'Código',
-            'grupo':     'Grupo',
-            'categoria': 'Categoría',
-            'area':      'Área',
-            'texto':     'Texto de la pregunta',
-            'peso_area': 'Peso del área',
-            'nivel':     'Nivel de madurez',
-        }
-        
+        fields = ['codigo', 'grupo', 'categoria', 'area', 'texto', 'peso_area', 'nivel']
+
+    def clean(self):
+        """
+        Validación cruzada: podrías, por ejemplo, asegurar que peso_area
+        sea coherente con otras áreas de la misma categoría.
+        """
+        cleaned = super().clean()
+        # ejemplo hipotético:
+        # if cleaned.get('peso_area') > 100:
+        #     self.add_error('peso_area', 'El peso no puede superar 100.')
+        return cleaned
 
 class GobernanzaForm(forms.Form):
     def __init__(self, *args, **kwargs):
@@ -130,40 +176,107 @@ class RegistroUsuarioForm(UserCreationForm):
 
 # Formulario para crear pregunta
 class PreguntaForm(ModelForm):
+    dimension = forms.CharField(
+        label='Dimensión',
+        required=True,
+        error_messages={'required': 'La dimensión es obligatoria.'},
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: Procesos',
+            'required': True,
+        })
+    )
+    criterio = forms.CharField(
+        label='Criterio',
+        required=True,
+        error_messages={'required': 'El criterio es obligatorio.'},
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: Nivel de control',
+            'required': True,
+        })
+    )
+    texto = forms.CharField(
+        label='Texto de la pregunta',
+        required=True,
+        error_messages={'required': 'El texto de la pregunta es obligatorio.'},
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Escribe el enunciado de la pregunta',
+            'required': True,
+        })
+    )
+
     class Meta:
         model = Pregunta
-        fields = ['codigo', 'dimension', 'criterio', 'texto']
-        widgets = {
-            'codigo':    forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
-            'dimension': forms.TextInput(attrs={'class': 'form-control'}),
-            'criterio':  forms.TextInput(attrs={'class': 'form-control'}),
-            'texto':     forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-        }
-        labels = {
-            'codigo': 'Código de la pregunta',
-        }
+        fields = ['dimension', 'criterio', 'texto']
+
+
+class OpcionPreguntaForm(ModelForm):
+    texto = forms.CharField(
+        label='Texto de la opción',
+        required=True,
+        error_messages={'required': 'El texto de la opción es obligatorio.'},
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: Sí, No, Parcial',
+            'required': True,
+        })
+    )
+    puntaje = forms.DecimalField(
+        label='Puntaje',
+        required=True,
+        min_value=0,
+        max_digits=5,
+        decimal_places=2,
+        validators=[MinValueValidator(0)],
+        error_messages={
+            'required':   'El puntaje es obligatorio.',
+            'invalid':    'Ingrese un puntaje válido.',
+            'min_value':  'El puntaje no puede ser negativo.',
+        },
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'required': True,
+        })
+    )
+    orden = forms.IntegerField(
+        label='Orden',
+        required=True,
+        min_value=1,
+        error_messages={
+            'required':   'El orden es obligatorio.',
+            'invalid':    'Ingrese un número entero válido.',
+            'min_value':  'El orden debe ser al menos 1.',
+        },
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'min': 1,
+            'required': True,
+        })
+    )
+
+    class Meta:
+        model = OpcionPregunta
+        fields = ['texto', 'puntaje', 'orden']
+
+
+# Inline formset sin cambios estructurales
+OpcionFormSet = inlineformset_factory(
+    Pregunta, OpcionPregunta,
+    fields=('texto', 'puntaje'),  # <- elimina 'orden' de aquí
+    extra=1, can_delete=True
+)
 
 # ————————————————
 # Form para Opciones de Pregunta
 # ————————————————
-class OpcionPreguntaForm(ModelForm):
-    class Meta:
-        model = OpcionPregunta
-        fields = ['texto', 'puntaje', 'orden']
-        widgets = {
-            'texto':   forms.TextInput(attrs={'class': 'form-control'}),
-            'puntaje': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'orden':   forms.NumberInput(attrs={'class': 'form-control'}),
-        }
+
 
 # Inline formset para ligar Opciones a la Pregunta
-OpcionFormSet = inlineformset_factory(
-    Pregunta,
-    OpcionPregunta,
-    form=OpcionPreguntaForm,
-    extra=1,
-    can_delete=True
-)
+
 
 # Formulario para registro de nuevo perfil (empresa)
 class RegistroPerfilForm(forms.ModelForm):
@@ -199,11 +312,11 @@ class RegistroPerfilForm(forms.ModelForm):
 
     def clean_rut(self):
         rut = self.cleaned_data['rut']
-        # (Opcional) validación de dígito verificador:
+        # opcional: comprueba dígito verificador
         num, dv = rut.split('-')
-        num = num.replace('.','')
-        # aquí podrías implementar el algoritmo del DV
-        # si falla, raise ValidationError('DV no corresponde')
+        num = num.replace('.', '')
+        # aquí podrías llamar a tu función de validación de DV
+        # if not valida_dv(num, dv): raise ValidationError('DV no corresponde')
         return rut
 
 # Formulario para editar datos de usuario
@@ -216,10 +329,41 @@ class UsuarioForm(ModelForm):
         }
 
 # Formulario para modificar perfil (empresa)
-class PerfilForm(ModelForm):
+class PerfilForm(forms.ModelForm):
+    rut = forms.CharField(
+        label='RUT',
+        max_length=12,
+        validators=[RegexValidator(
+            regex=r'^\d{1,2}\.?\d{3}\.?\d{3}-[\dkK]$',
+            message='Formato inválido. Ej: 12.345.678-5'
+        )],
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': '12.345.678-5',
+        }),
+        error_messages={'required': 'El RUT es obligatorio.'},
+    )
+    nombre_empresa = forms.CharField(
+        label='Nombre de la empresa',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Mi Empresa Ltda.',
+        }),
+        error_messages={'required': 'El nombre de la empresa es obligatorio.'},
+    )
+
     class Meta:
         model = Perfil
         fields = ['rut', 'nombre_empresa']
+
+    def clean_rut(self):
+        rut = self.cleaned_data['rut']
+        # opcional: comprueba dígito verificador
+        num, dv = rut.split('-')
+        num = num.replace('.', '')
+        # aquí podrías llamar a tu función de validación de DV
+        # if not valida_dv(num, dv): raise ValidationError('DV no corresponde')
+        return rut
 
 
 class EncuestaGDForm(forms.Form):

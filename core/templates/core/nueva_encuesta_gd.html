@@ -5,6 +5,12 @@
 <style>
   .pregunta-texto { margin-bottom: .5rem; }
   .radio-group label { min-width: 100px; }
+  .question-error {
+    display: none;
+    color: #dc3545;
+    font-size: 0.875em;
+    margin-top: .25rem;
+  }
 </style>
 {% endblock extrahead %}
 
@@ -12,21 +18,10 @@
 <div class="container my-5">
   <h2 class="mb-4 text-center">Encuesta de Gobernanza de Datos (GD)</h2>
 
-  {% if user.is_superuser %}
-    <div class="text-end mb-4">
-      <a href="{% url 'zpoblar2' %}"
-         class="btn btn-sm btn-secondary"
-         onclick="return confirm('¿Seguro que quieres repoblar todas las preguntas GD? Se eliminarán las existentes.');">
-        Poblar preguntas GD
-      </a>
-    </div>
-  {% endif %}
-
-  <form method="post" action="{% url 'nueva_encuesta_gd' %}">
+  <form id="gdForm" method="post" action="{% url 'nueva_encuesta_gd' %}">
     {% csrf_token %}
 
     <div class="accordion" id="accordionGrupos">
-      {# --- Por cada Grupo --- #}
       {% for grupo, categorias in preguntas_agrupadas.items %}
         <div class="accordion-item">
           <h2 class="accordion-header" id="headingGrupo{{ forloop.counter }}">
@@ -46,7 +41,6 @@
             <div class="accordion-body">
 
               <div class="accordion" id="accordionCat{{ forloop.counter }}">
-                {# --- Por cada Categoría dentro del Grupo --- #}
                 {% for categoria, preguntas in categorias.items %}
                   <div class="accordion-item">
                     <h2 class="accordion-header" id="headingCat{{ forloop.parentloop.counter }}_{{ forloop.counter }}">
@@ -64,9 +58,8 @@
                          aria-labelledby="headingCat{{ forloop.parentloop.counter }}_{{ forloop.counter }}"
                          data-bs-parent="#accordionCat{{ forloop.parentloop.counter }}">
                       <div class="accordion-body">
-                        {# --- Lista de Preguntas --- #}
                         {% for pregunta in preguntas %}
-                          <div class="mb-4">
+                          <div class="mb-4 question-block" data-qid="{{ pregunta.id }}">
                             <div class="pregunta-texto">
                               <strong>{{ pregunta.area }}.{{ pregunta.numero }}</strong>
                               {{ pregunta.texto }}
@@ -76,14 +69,23 @@
                             </div>
                             <div class="radio-group btn-group" role="group" aria-label="Valoración">
                               {% for val, label in pregunta.respuestagd_set.model.VALORACION %}
-                                <label class="btn btn-outline-primary btn-sm">
-                                  <input type="radio"
-                                         name="p_{{ pregunta.id }}"
-                                         value="{{ val }}"
-                                         required>
+                                <input
+                                  class="btn-check"
+                                  type="radio"
+                                  name="p_{{ pregunta.id }}"
+                                  id="p{{ pregunta.id }}_v{{ val }}"
+                                  value="{{ val }}"
+                                  autocomplete="off"
+                                >
+                                <label
+                                  class="btn btn-outline-primary btn-sm"
+                                  for="p{{ pregunta.id }}_v{{ val }}">
                                   {{ label }}
                                 </label>
                               {% endfor %}
+                            </div>
+                            <div class="question-error">
+                              Por favor responda esta pregunta.
                             </div>
                           </div>
                         {% endfor %}
@@ -105,3 +107,44 @@
   </form>
 </div>
 {% endblock content %}
+
+{% block script %}
+<script>
+document.getElementById('gdForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  let firstError = null;
+
+  this.querySelectorAll('.question-block').forEach(block => {
+    const qid = block.dataset.qid;
+    const answered = block.querySelector(`input[name="p_${qid}"]:checked`);
+    const errorDiv = block.querySelector('.question-error');
+
+    if (!answered) {
+      errorDiv.style.display = 'block';
+
+      // 1) Expandir panel de categoría
+      const catCollapse = block.closest('.accordion-collapse');
+      const catBtn = document.querySelector(`[data-bs-target="#${catCollapse.id}"]`);
+      catBtn.classList.remove('collapsed');
+      bootstrap.Collapse.getOrCreateInstance(catCollapse).show();
+
+      // 2) Expandir panel de grupo
+      const grpCollapse = catCollapse.parentElement.closest('.accordion-collapse');
+      const grpBtn = document.querySelector(`[data-bs-target="#${grpCollapse.id}"]`);
+      grpBtn.classList.remove('collapsed');
+      bootstrap.Collapse.getOrCreateInstance(grpCollapse).show();
+
+      if (!firstError) firstError = block;
+    } else {
+      errorDiv.style.display = 'none';
+    }
+  });
+
+  if (firstError) {
+    firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else {
+    this.submit();
+  }
+});
+</script>
+{% endblock script %}

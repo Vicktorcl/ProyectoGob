@@ -1,6 +1,8 @@
 {% extends 'core/base.html' %}
 {% load static %}
 
+{% block title %}Ingresar{% endblock %}
+
 {% block content %}
 <div class="container border border-dark p-4" style="max-width:500px; margin:0 auto;">
   <h2 class="text-center mb-4">Ingreso de Usuario</h2>
@@ -35,11 +37,9 @@
         placeholder="Tu contraseña"
         required
       >
-      {# errores de campo (vacío, etc.) #}
       {% for error in form.password.errors %}
         <div class="invalid-feedback">{{ error }}</div>
       {% endfor %}
-      {# único error de credenciales incorrectas #}
       {% if form.non_field_errors %}
         <div class="invalid-feedback">{{ form.non_field_errors.0 }}</div>
       {% endif %}
@@ -50,8 +50,9 @@
     </div>
 
     <div class="mt-3 text-center">
+      <a href="{% url 'inicio' %}">Inicio</a> |
       <a href="{% url 'registro' %}">Registrarse</a> |
-      <a href="#">¿Olvidaste tu contraseña?</a>
+      <a href="{% url 'password_reset' %}">¿Olvidaste tu contraseña?</a>
     </div>
   </form>
 </div>

@@ -1,52 +1,105 @@
 {% extends 'core/base.html' %}
 {% load static %}
-{% load custom_filters %}
 
 {% block content %}
+<div class="container border border-dark p-4" style="max-width:800px; margin:0 auto;">
+  <h2 class="text-center mb-4">Mis datos</h2>
 
-<div class="container border border-dark p-4">
-  <h2 class="text-center">Mis datos </h2>
-<br>
-  <form id="form" method="POST" enctype="multipart/form-data">
-    <div class="container">
+  <form method="post" enctype="multipart/form-data" novalidate>
     {% csrf_token %}
 
     <div class="row">
-      <div class="col-9">
+      {# — Non-field errors de form_usuario — #}
+      <div class="col-md-6">
+        {% if form_usuario.non_field_errors %}
+          <div class="mb-3">
+            {% for err in form_usuario.non_field_errors %}
+              <div class="invalid-feedback d-block">{{ err }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
 
-        {{form_usuario|as_bootstrap_form:'help_text_visible=False' }}
+        {# — Username — #}
+        <div class="mb-3 text-start">
+          <label for="id_username" class="form-label">Nombre de usuario</label>
+          <input
+            type="text"
+            name="username"
+            id="id_username"
+            class="form-control {% if form_usuario.username.errors %}is-invalid{% endif %}"
+            value="{{ form_usuario.username.value|default_if_none:'' }}"
+            required
+          >
+          {% for err in form_usuario.username.errors %}
+            <div class="invalid-feedback">{{ err }}</div>
+          {% endfor %}
+        </div>
 
-
-
-        {{ form_perfil|as_bootstrap_form }}
-
+        {# — Email — #}
+        <div class="mb-3 text-start">
+          <label for="id_email" class="form-label">Correo electrónico</label>
+          <input
+            type="email"
+            name="email"
+            id="id_email"
+            class="form-control {% if form_usuario.email.errors %}is-invalid{% endif %}"
+            value="{{ form_usuario.email.value|default_if_none:'' }}"
+            required
+          >
+          {% for err in form_usuario.email.errors %}
+            <div class="invalid-feedback">{{ err }}</div>
+          {% endfor %}
+        </div>
       </div>
 
-      <!-- AREA DE IMAGEN DE PERFIL -->
+      {# — Non-field errors de form_perfil — #}
+      <div class="col-md-6">
+        {% if form_perfil.non_field_errors %}
+          <div class="mb-3">
+            {% for err in form_perfil.non_field_errors %}
+              <div class="invalid-feedback d-block">{{ err }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
 
+        {# — RUT — #}
+        <div class="mb-3 text-start">
+          <label for="id_rut" class="form-label">RUT</label>
+          <input
+            type="text"
+            name="rut"
+            id="id_rut"
+            class="form-control {% if form_perfil.rut.errors %}is-invalid{% endif %}"
+            value="{{ form_perfil.rut.value|default_if_none:'' }}"
+            required
+            pattern="^\d{1,2}\.?\d{3}\.?\d{3}-[\dkK]$"
+          >
+          {% for err in form_perfil.rut.errors %}
+            <div class="invalid-feedback">{{ err }}</div>
+          {% endfor %}
+        </div>
 
+        {# — Nombre de la empresa — #}
+        <div class="mb-3 text-start">
+          <label for="id_nombre_empresa" class="form-label">Nombre de la empresa</label>
+          <input
+            type="text"
+            name="nombre_empresa"
+            id="id_nombre_empresa"
+            class="form-control {% if form_perfil.nombre_empresa.errors %}is-invalid{% endif %}"
+            value="{{ form_perfil.nombre_empresa.value|default_if_none:'' }}"
+            required
+          >
+          {% for err in form_perfil.nombre_empresa.errors %}
+            <div class="invalid-feedback">{{ err }}</div>
+          {% endfor %}
+        </div>
+      </div>
     </div>
 
-    <!-- AREA DE BOTONES -->
-    <div class="mt-2 text-center">
-
-      <button type="submit" class="btn btn-primary"> Actualizar mis datos </button>
-
-      
-
+    <div class="text-center mt-4">
+      <button type="submit" class="btn btn-primary">Actualizar mis datos</button>
     </div>
-  </div>
   </form>
-
 </div>
-  <br>
-<br>
-<br>
-<br>
-<br>
-<br>
 {% endblock content %}
-
-{% block script %}
-  <script src="{% static 'core/js/misdatos.js' %}"></script>
-{% endblock script %}

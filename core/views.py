@@ -6,10 +6,10 @@ from django.db.models.functions import TruncDate
 from django.forms import inlineformset_factory
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.contrib.auth import login, logout, authenticate
+from django.contrib.auth import login, logout, authenticate, views as auth_views
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import PasswordChangeForm
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.db import models
 from .models import (
     Perfil, Pregunta, OpcionPregunta,
@@ -47,7 +47,7 @@ def es_usuario_anonimo(user):
 # ------------------------------------------------------------------------------------------------------
 
 
-@user_passes_test(es_usuario_anonimo, login_url='formulario_gobernanza')
+@user_passes_test(es_usuario_anonimo, login_url='nosotros')
 def inicio(request):
     """
     GET: muestra el formulario de login.
@@ -65,7 +65,7 @@ def inicio(request):
         if user and user.is_active:
             login(request, user)
             messages.success(request, f'¡Bienvenido(a) {user.first_name} {user.last_name}!')
-            return redirect('formulario_gobernanza')
+            return redirect('nosotros')
 
         # Credenciales inválidas → error non-field
         form.add_error(None, 'Usuario o contraseña incorrectos o cuenta desactivada')
@@ -456,100 +456,138 @@ def mipassword(request):
 @user_passes_test(es_superusuario_activo)
 def mantenedor_usuarios(request, accion, id):
     usuario = get_object_or_404(User, id=id) if int(id) > 0 else None
-    perfil = getattr(usuario, 'perfil', None)
+    perfil  = getattr(usuario, 'perfil', None)
 
-    # Manejo de POST (crear/actualizar)
+    # ——— Manejo de eliminación ———
+    if accion == 'eliminar' and request.method == 'POST':
+        eliminado, mensaje = eliminar_registro(User, id)
+        if eliminado:
+            messages.success(request, mensaje)
+        else:
+            messages.error(request, mensaje)
+        # Después de eliminar, volvemos a “crear” (listado vacío)
+        return redirect('mantenedor_usuarios', accion='crear', id=0)
+
+    # ——— Manejo de creación/actualización ———
     if request.method == 'POST':
         form_usuario = UsuarioForm(request.POST, instance=usuario)
         form_perfil  = PerfilForm(request.POST, request.FILES, instance=perfil)
+
         if form_usuario.is_valid() and form_perfil.is_valid():
             usuario = form_usuario.save()
             perfil  = form_perfil.save(commit=False)
-            perfil.usuario_id = usuario.id
+            perfil.usuario = usuario
             perfil.save()
             messages.success(request, f'Usuario {usuario.username} guardado.')
             return redirect('mantenedor_usuarios', accion='actualizar', id=usuario.id)
-        else:
-            messages.error(request, 'No fue posible guardar el usuario')
-            show_form_errors(request, [form_usuario, form_perfil])
-
-    # Eliminar
-    elif request.method == 'GET' and accion == 'eliminar':
-        eliminado, mensaje = eliminar_registro(User, id)
-        messages.success(request, mensaje)
-        return redirect('mantenedor_usuarios', accion='crear', id=0)
+        # si no es válido, dejo que los errores se muestren en el template
 
     else:
         form_usuario = UsuarioForm(instance=usuario)
         form_perfil  = PerfilForm(instance=perfil)
 
-    # **Aquí: recogemos todos los usuarios para listarlos abajo**
     usuarios = User.objects.all().select_related('perfil')
-
     return render(request, 'core/mantenedor_usuarios.html', {
         'form_usuario': form_usuario,
         'form_perfil':   form_perfil,
         'accion':        accion,
         'usuario':       usuario,
-        'usuarios':      usuarios,   # <-- nuevo
+        'usuarios':      usuarios,
     })
+    
+
+def password_reset_request(request):
+    """
+    Muestra el formulario para que el usuario ingrese su email y reciba
+    el enlace de recuperación.
+    """
+    view = auth_views.PasswordResetView.as_view(
+        template_name='registration/password_reset_form.html',
+        email_template_name='registration/password_reset_email.html',
+        subject_template_name='registration/password_reset_subject.txt',
+        success_url=reverse_lazy('password_reset_done'),
+    )
+    return view(request)
+
+def password_reset_done_view(request):
+    """
+    Mensaje que indica “chequea tu correo”.
+    """
+    view = auth_views.PasswordResetDoneView.as_view(
+        template_name='registration/password_reset_done.html'
+    )
+    return view(request)
+
+def password_reset_confirm_view(request, uidb64, token):
+    """
+    Formulario para escribir la nueva contraseña tras validar el token.
+    """
+    view = auth_views.PasswordResetConfirmView.as_view(
+        template_name='registration/password_reset_confirm.html',
+        success_url=reverse_lazy('password_reset_complete'),
+    )
+    return view(request, uidb64=uidb64, token=token)
+
+def password_reset_complete_view(request):
+    """
+    Página final: “tu contraseña ya fue cambiada”.
+    """
+    view = auth_views.PasswordResetCompleteView.as_view(
+        template_name='registration/password_reset_complete.html'
+    )
+    return view(request)
 
 @login_required
 @user_passes_test(es_superusuario_activo)
 def mantenedor_preguntas(request, accion, id):
     """
-    Mantenedor de preguntas con inline formset de opciones.
-    - accion: 'crear', 'actualizar' o 'eliminar'
-    - id: 0 para crear, o el PK de la pregunta para editar/borrar.
+    CRUD para preguntas clásicas.
     """
-    # Validar acción
     if accion not in ('crear', 'actualizar', 'eliminar'):
         messages.error(request, 'Acción inválida.')
         return redirect('mantenedor_preguntas', accion='crear', id=0)
 
-    pregunta = None
-    if accion in ('actualizar', 'eliminar'):
-        pregunta = get_object_or_404(Pregunta, pk=id)
+    pregunta = get_object_or_404(Pregunta, pk=id) if int(id) > 0 else None
 
-    # Eliminar
+    # ELIMINAR ENTIDAD
     if accion == 'eliminar' and pregunta:
         pregunta.delete()
         messages.success(request, 'Pregunta eliminada correctamente.')
         return redirect('mantenedor_preguntas', accion='crear', id=0)
 
-    # Bind / inicialización
     if request.method == 'POST':
         form    = PreguntaForm(request.POST, instance=pregunta)
         formset = OpcionFormSet(request.POST, instance=pregunta)
+
         if form.is_valid() and formset.is_valid():
-            # 1) Guardar pregunta
-            pregunta = form.save(commit=False)
+            # 1) Guardar o actualizar la pregunta
+            pregunta_obj = form.save(commit=False)
             if accion == 'crear':
-                siguiente = Pregunta.objects.aggregate(
-                    max_codigo=Max('codigo')
-                )['max_codigo'] or 0
-                pregunta.codigo = siguiente + 1
-            pregunta.save()
+                siguiente = (Pregunta.objects.aggregate(max_codigo=Max('codigo'))['max_codigo'] or 0) + 1
+                pregunta_obj.codigo = siguiente
+            pregunta_obj.save()
 
-            # 2) Reasignar orden automático
-            for idx, subform in enumerate(formset.forms, start=1):
-                # si no está marcado para borrado
-                if not subform.cleaned_data.get('DELETE', False):
-                    subform.instance.orden = idx
+            # 2) Inyectar el objeto en el formset y reasignar orden
+            formset.instance = pregunta_obj
+            for idx, sub in enumerate(formset.forms, start=1):
+                # si no está marcado para borrar
+                if not sub.cleaned_data.get('DELETE', False):
+                    sub.instance.orden = idx
 
-            # 3) Guardar opciones
-            formset.instance = pregunta
+            # 3) Guardar TODO el formset: crea, actualiza y borra donde DELETE=True
             formset.save()
 
             messages.success(request, 'Pregunta y opciones guardadas correctamente.')
-            return redirect('mantenedor_preguntas', accion='actualizar', id=pregunta.pk)
+            return redirect('mantenedor_preguntas',
+                             accion='actualizar',
+                             id=pregunta_obj.pk)
         else:
             messages.error(request, 'Corrige los errores del formulario.')
     else:
         form    = PreguntaForm(instance=pregunta)
         formset = OpcionFormSet(instance=pregunta)
 
-    preguntas = Pregunta.objects.all()
+    preguntas = Pregunta.objects.all().order_by('codigo')
     return render(request, 'core/mantenedor_preguntas.html', {
         'form':      form,
         'formset':   formset,
@@ -623,6 +661,10 @@ def mantenedor_preguntas_gd_gd(request, accion=None, id=0):
         'preguntas': preguntas,
         'accion': 'listar',
     })
+
+
+
+
 
 @user_passes_test(es_superusuario_activo)
 def cambiar_password(request):

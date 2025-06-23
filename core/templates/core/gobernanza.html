@@ -1,23 +1,24 @@
 {% extends 'core/base.html' %}
 {% load static %}
 
-{% block title %}
-Formulario de Gobernanza de Datos
-{% endblock title %}
-
 {% block extrahead %}
 <style>
   .respuesta-btn { min-width: 80px; }
+  .question-error {
+    display: none;
+    color: #dc3545;
+    font-size: 0.875em;
+    margin-top: .5rem;
+  }
 </style>
 {% endblock extrahead %}
 
 {% block content %}
 <div class="container my-5">
   <h2 class="mb-4 text-center">Formulario de Gobernanza de Datos</h2>
-  <form method="post" action="{% url 'formulario_gobernanza' %}">
+  <form id="gobForm" method="post" action="{% url 'formulario_gobernanza' %}">
     {% csrf_token %}
 
-    {# Agrupamos preguntas por dimensión #}
     {% regroup preguntas by dimension as dimension_list %}
     <div class="accordion" id="accordionDimensiones">
       {% for group in dimension_list %}
@@ -38,7 +39,7 @@ Formulario de Gobernanza de Datos
                data-bs-parent="#accordionDimensiones">
             <div class="accordion-body">
               {% for pregunta in group.list %}
-                <div class="card mb-3">
+                <div class="card mb-3" data-pk="{{ pregunta.pk }}">
                   <div class="card-header">
                     <span>Criterio:</span> {{ pregunta.criterio }}
                   </div>
@@ -47,7 +48,6 @@ Formulario de Gobernanza de Datos
                       {{ forloop.parentloop.counter }}.{{ forloop.counter }} {{ pregunta.texto }}
                     </p>
                     <div class="btn-group" role="group" aria-label="Respuestas">
-                      {# Ahora iteramos sobre 'pregunta.lista_opciones' #}
                       {% if pregunta.lista_opciones %}
                         {% for opcion in pregunta.lista_opciones %}
                           <input
@@ -57,7 +57,7 @@ Formulario de Gobernanza de Datos
                             id="p{{ pregunta.pk }}_o{{ opcion.pk }}"
                             value="{{ opcion.pk }}"
                             autocomplete="off"
-                            required>
+                          >
                           <label
                             class="btn btn-outline-secondary respuesta-btn"
                             for="p{{ pregunta.pk }}_o{{ opcion.pk }}">
@@ -65,7 +65,6 @@ Formulario de Gobernanza de Datos
                           </label>
                         {% endfor %}
                       {% else %}
-                        {# Si no hay opciones para esta pregunta, muestro Sí/No #}
                         <input
                           class="btn-check"
                           type="radio"
@@ -73,7 +72,7 @@ Formulario de Gobernanza de Datos
                           id="p{{ pregunta.pk }}_si"
                           value="si"
                           autocomplete="off"
-                          required>
+                        >
                         <label
                           class="btn btn-outline-success respuesta-btn"
                           for="p{{ pregunta.pk }}_si">
@@ -86,7 +85,7 @@ Formulario de Gobernanza de Datos
                           id="p{{ pregunta.pk }}_no"
                           value="no"
                           autocomplete="off"
-                          required>
+                        >
                         <label
                           class="btn btn-outline-danger respuesta-btn"
                           for="p{{ pregunta.pk }}_no">
@@ -94,6 +93,9 @@ Formulario de Gobernanza de Datos
                         </label>
                       {% endif %}
                     </div>
+                  </div>
+                  <div class="question-error">
+                    Por favor responda esta pregunta.
                   </div>
                 </div>
               {% endfor %}
@@ -109,3 +111,38 @@ Formulario de Gobernanza de Datos
   </form>
 </div>
 {% endblock content %}
+
+{% block script %}
+<script>
+document.getElementById('gobForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  let form = this;
+  let errorFound = false;
+  let firstErrorCard = null;
+
+  form.querySelectorAll('.card[data-pk]').forEach(card => {
+    let pk = card.getAttribute('data-pk');
+    let radios = card.querySelectorAll('input[name="respuesta_' + pk + '"]');
+    let answered = Array.from(radios).some(r => r.checked);
+    let errorDiv = card.querySelector('.question-error');
+    if (!answered) {
+      errorFound = true;
+      errorDiv.style.display = 'block';
+      // Expand the containing accordion panel
+      let collapse = card.closest('.accordion-collapse');
+      let bsCollapse = bootstrap.Collapse.getOrCreateInstance(collapse, { toggle: false });
+      bsCollapse.show();
+      if (!firstErrorCard) firstErrorCard = card;
+    } else {
+      errorDiv.style.display = 'none';
+    }
+  });
+
+  if (errorFound) {
+    firstErrorCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else {
+    form.submit();
+  }
+});
+</script>
+{% endblock script %}

@@ -21,12 +21,12 @@
   {% block stylesheet %}{% endblock stylesheet %}
   {% block script_head %}{% endblock script_head %}
 </head>
-<body>
+<body class="d-flex flex-column min-vh-100">
 
   <!-- MENÚ SUPERIOR -->
   <nav class="navbar navbar-expand-lg navbar-light bg-light">
     <div class="container-fluid">
-      <a class="navbar-brand" href="{% url 'inicio' %}">
+      <a class="navbar-brand" href="{% url 'nosotros' %}">
         <img src="{% static 'core/img/logo.png' %}" width="50" alt="Logo">
       </a>
       <button class="navbar-toggler" type="button"
@@ -41,6 +41,8 @@
           <li class="nav-item">
             <a class="nav-link" href="{% url 'inicio' %}">Inicio</a>
           </li>
+          
+
 
           {% if user.is_authenticated %}
             <!-- Dropdown Encuestas -->
@@ -52,12 +54,12 @@
               <ul class="dropdown-menu" aria-labelledby="encuestasDropdown">
                 <li>
                   <a class="dropdown-item" href="{% url 'formulario_gobernanza' %}">
-                    Gobernanza de Datos
+                    Modelo MGDE
                   </a>
                 </li>
                 <li>
                   <a class="dropdown-item" href="{% url 'nueva_encuesta_gd' %}">
-                    Nuevo Modelo GD
+                    Modelo 4.0 de Madurez de Datos
                   </a>
                 </li>
               </ul>
@@ -72,19 +74,15 @@
               <ul class="dropdown-menu" aria-labelledby="respuestasDropdown">
                 <li>
                   <a class="dropdown-item" href="{% url 'seleccionar_encuesta' %}">
-                    Ver Respuestas Clásicas
+                    Ver Respuestas Modelo MGDE
                   </a>
                 </li>
                 <li>
                   <a class="dropdown-item" href="{% url 'seleccionar_encuesta_gd' %}">
-                    Ver Respuestas Modelo GD
+                    Ver Respuestas Modelo 4.0 de Madurez de Datos
                   </a>
                 </li>
               </ul>
-            </li>
-
-            <li class="nav-item">
-              <a class="nav-link" href="{% url 'nosotros' %}">Nosotros</a>
             </li>
             <li class="nav-item">
               <a class="nav-link" href="{% url 'misdatos' %}">Mis datos</a>
@@ -110,25 +108,25 @@
                   <li>
                     <a class="dropdown-item"
                        href="{% url 'mantenedor_preguntas' accion='crear' id=0 %}">
-                      Preguntas Clásicas
+                       Preguntas Modelo MGDE
                     </a>
                   </li>
                   <li>
                     <a class="dropdown-item" href="{% url 'mantenedor_respuestas' %}">
-                      Respuestas Clásicas
+                      Respuestas Modelo MGDE
                     </a>
                   </li>
                   <li><hr class="dropdown-divider"></li>
                   <li>
                     <a class="dropdown-item"
                        href="{% url 'mantenedor_preguntas_gd' %}">
-                      Preguntas Modelo GD
+                       Preguntas Modelo 4.0 de Madurez de Datos
                     </a>
                   </li>
                   <li>
                     <a class="dropdown-item"
                        href="{% url 'mantenedor_respuestas_gd' %}">
-                      Respuestas Modelo GD
+                      Respuestas Modelo 4.0 de Madurez de Datos
                     </a>
                   </li>
                 </ul>
@@ -146,8 +144,9 @@
             <li class="nav-item">
               <a class="nav-link" href="{% url 'registro' %}">Registrarse</a>
             </li>
+
             <li class="nav-item">
-              <a class="nav-link" href="{% url 'ingresar' %}">Ingresar</a>
+              <a class="nav-link" href="{% url 'nosotros' %}">Nosotros</a>
             </li>
           {% endif %}
 
@@ -161,15 +160,17 @@
     {% include 'common/mostrar_mensajes.html' %}
   </div>
 
-  <!-- CONTENIDO PRINCIPAL -->
-  <div class="container mt-4">
+  <!-- CONTENIDO PRINCIPAL: ocupa todo el espacio restante -->
+  <main class="container flex-grow-1 mt-4">
     {% block content %}{% endblock content %}
-  </div>
+  </main>
 
-  <!-- FOOTER -->
-  <footer class="bg-dark text-white py-4 mt-5">
+  <!-- FOOTER: siempre al fondo -->
+  <footer class="bg-dark text-white py-4 mt-auto">
     <div class="container text-center">
-      <p>Contacto via Whatsapp, Instagram, Facebook...</p>
+      <p><strong>GobernanzaOnline</strong></p>
+      <p>Av. Manquehue 1234, Las Condes, Santiago</p>
+      <p>Tel: +56 9 1234 5678 | Email: contacto@gobernanzaonline.cl</p>
     </div>
   </footer>
 

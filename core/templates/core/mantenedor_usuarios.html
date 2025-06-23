@@ -1,83 +1,184 @@
 {% extends 'core/base.html' %}
 {% load static %}
-{% load custom_filters %}
 
 {% block content %}
-<div class="container border border-dark p-4">
-  <h2 class="text-center">Mantenedor Usuarios</h2>
+<style>
+  /* Anula iconos de validación Bootstrap */
+  .form-control:invalid,
+  .form-control:valid,
+  .is-invalid,
+  .is-valid {
+    background-image: none !important;
+    box-shadow: none !important;
+  }
+  input.form-control::-webkit-search-decoration,
+  input.form-control::-webkit-search-cancel-button,
+  input.form-control::-webkit-search-results-button,
+  input.form-control::-webkit-search-results-decoration {
+    display: none !important;
+  }
+</style>
 
-  <form id="form" method="POST" enctype="multipart/form-data">
+<div class="container border border-dark p-4" style="max-width:900px; margin:0 auto;">
+  <h2 class="text-center mb-4">Mantenedor de Usuarios</h2>
+
+  <form method="post" enctype="multipart/form-data" novalidate>
     {% csrf_token %}
     <div class="row">
-      <div class="col-md-9">
-        {{ form_usuario|as_bootstrap_form }}
-        {{ form_perfil|as_bootstrap_form }}
+      <div class="col-md-12">
+        {# — Errores globales de UsuarioForm — #}
+        {% if form_usuario.non_field_errors %}
+          <div class="alert alert-danger">
+            {% for err in form_usuario.non_field_errors %}
+              {{ err }}<br>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        {# — Nombre de usuario — #}
+        <div class="mb-3 text-start">
+          <label for="id_username" class="form-label">Nombre de usuario</label>
+          <input
+            type="text"
+            name="username"
+            id="id_username"
+            class="form-control {% if form_usuario.username.errors %}is-invalid{% endif %}"
+            value="{{ form_usuario.username.value|default_if_none:'' }}"
+            required
+          >
+          {% for err in form_usuario.username.errors %}
+            <div class="invalid-feedback">{{ err }}</div>
+          {% endfor %}
+        </div>
+
+        {# — Correo electrónico — #}
+        <div class="mb-3 text-start">
+          <label for="id_email" class="form-label">Correo electrónico</label>
+          <input
+            type="email"
+            name="email"
+            id="id_email"
+            class="form-control {% if form_usuario.email.errors %}is-invalid{% endif %}"
+            value="{{ form_usuario.email.value|default_if_none:'' }}"
+            required
+          >
+          {% for err in form_usuario.email.errors %}
+            <div class="invalid-feedback">{{ err }}</div>
+          {% endfor %}
+        </div>
+
+        {# — Errores globales de PerfilForm — #}
+        {% if form_perfil.non_field_errors %}
+          <div class="alert alert-danger">
+            {% for err in form_perfil.non_field_errors %}
+              {{ err }}<br>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        {# — RUT — #}
+        <div class="mb-3 text-start">
+          <label for="id_rut" class="form-label">RUT</label>
+          <input
+            type="text"
+            name="rut"
+            id="id_rut"
+            class="form-control {% if form_perfil.rut.errors %}is-invalid{% endif %}"
+            value="{{ form_perfil.rut.value|default_if_none:'' }}"
+            placeholder="12.345.678-5"
+            required
+          >
+          {% for err in form_perfil.rut.errors %}
+            <div class="invalid-feedback">{{ err }}</div>
+          {% endfor %}
+        </div>
+
+        {# — Nombre de la empresa — #}
+        <div class="mb-3 text-start">
+          <label for="id_nombre_empresa" class="form-label">Nombre de la empresa</label>
+          <input
+            type="text"
+            name="nombre_empresa"
+            id="id_nombre_empresa"
+            class="form-control {% if form_perfil.nombre_empresa.errors %}is-invalid{% endif %}"
+            value="{{ form_perfil.nombre_empresa.value|default_if_none:'' }}"
+            placeholder="Mi Empresa Ltda."
+            required
+          >
+          {% for err in form_perfil.nombre_empresa.errors %}
+            <div class="invalid-feedback">{{ err }}</div>
+          {% endfor %}
+        </div>
       </div>
-      <div class="col-1">
-        {# Aquí podrías mostrar la foto del perfil si la tienes #}
-      </div>
+
+
     </div>
-    <div class="mt-2 text-center">
+
+    <div class="d-grid gap-2 mt-3 text-center">
       <button type="submit" class="btn btn-primary">Guardar</button>
-      <a href="{% url 'mantenedor_usuarios' 'crear' 0 %}"
-         class="btn btn-success">Nuevo</a>
+      <a href="{% url 'mantenedor_usuarios' 'crear' 0 %}" class="btn btn-success">Nuevo</a>
     </div>
   </form>
 </div>
 
-{# — Tabla de usuarios — #}
 {% if usuarios %}
-  <div class="container mt-4">
-    <table id="tabla-principal" class="table table-hover">
+  <div class="container mt-5">
+    <table class="table table-hover">
       <thead class="table-light">
         <tr>
           <th>ID</th>
-          <th>Cuenta</th>
-          <th>Tipo usuario</th>
+          <th>Usuario</th>
+          <th>Tipo</th>
           <th>RUT</th>
           <th>Nombre</th>
           <th>Apellidos</th>
           <th>Correo</th>
-          <th>Con Subscripción</th>
+          <th>Suscrito</th>
           <th>Imagen</th>
           <th>Acciones</th>
         </tr>
       </thead>
       <tbody>
-        {% for usuario in usuarios %}
+        {% for u in usuarios %}
           <tr>
-            <td>{{ usuario.id }}</td>
-            <td>{{ usuario.username }}</td>
-            <td>{{ usuario.perfil.tipo_usuario }}</td>
-            <td>{{ usuario.perfil.rut }}</td>
-            <td>{{ usuario.first_name }}</td>
-            <td>{{ usuario.last_name }}</td>
-            <td>{{ usuario.email }}</td>
+            <td>{{ u.id }}</td>
+            <td>{{ u.username }}</td>
+            <td>{{ u.perfil.tipo_usuario }}</td>
+            <td>{{ u.perfil.rut }}</td>
+            <td>{{ u.first_name }}</td>
+            <td>{{ u.last_name }}</td>
+            <td>{{ u.email }}</td>
+            <td>{% if u.perfil.subscrito %}Sí{% else %}No{% endif %}</td>
             <td>
-              {% if usuario.perfil.subscrito %}Sí{% else %}No{% endif %}
-            </td>
-            <td>
-              {% if usuario.perfil.imagen %}
-                <img src="{{ usuario.perfil.imagen.url }}"
-                     alt="Foto {{ usuario.username }}"
+              {% if u.perfil.imagen %}
+                <img src="{{ u.perfil.imagen.url }}"
+                     alt="Foto {{ u.username }}"
                      class="img-thumbnail" style="width:40px;">
               {% endif %}
             </td>
             <td>
-              <div class="btn-group">
-                <a href="{% url 'mantenedor_usuarios' 'actualizar' usuario.id %}"
+              <div class="btn-group" role="group">
+                <a href="{% url 'mantenedor_usuarios' 'actualizar' u.id %}"
                    class="btn btn-primary btn-sm">Editar</a>
-                <a href="{% url 'mantenedor_usuarios' 'eliminar' usuario.id %}"
-                   class="btn btn-danger btn-sm"
-                   onclick="return confirm('¿Eliminar al usuario {{ usuario.username }}?');">
-                  Eliminar
-                </a>
-                <form action="{% url 'cambiar_password' %}" method="post"
-                      id="form_{{ usuario.username }}" class="d-inline">
+
+                {# — Ahora el botón de eliminar usa su propio form POST — #}
+                <form method="post"
+                      action="{% url 'mantenedor_usuarios' 'eliminar' u.id %}"
+                      class="d-inline">
                   {% csrf_token %}
-                  <input type="hidden" name="username" value="{{ usuario.username }}">
-                  <button class="btn btn-info btn-sm"
-                          onclick="return confirm('¿Enviar nueva contraseña a {{ usuario.username }}?');">
+                  <button type="submit"
+                          class="btn btn-danger btn-sm"
+                          onclick="return confirm('¿Eliminar al usuario {{ u.username }}?');">
+                    Eliminar
+                  </button>
+                </form>
+
+                <form action="{% url 'cambiar_password' %}" method="post" class="d-inline">
+                  {% csrf_token %}
+                  <input type="hidden" name="username" value="{{ u.username }}">
+                  <button type="submit"
+                          class="btn btn-info btn-sm"
+                          onclick="return confirm('¿Enviar nueva contraseña a {{ u.username }}?');">
                     Contraseña
                   </button>
                 </form>
@@ -86,9 +187,7 @@
           </tr>
         {% empty %}
           <tr>
-            <td colspan="10" class="text-center">
-              No hay usuarios registrados.
-            </td>
+            <td colspan="10" class="text-center">No hay usuarios registrados.</td>
           </tr>
         {% endfor %}
       </tbody>
@@ -96,7 +195,3 @@
   </div>
 {% endif %}
 {% endblock content %}
-
-{% block script %}
-  <script src="{% static 'core/js/validador_usuarios.js' %}"></script>
-{% endblock script %}

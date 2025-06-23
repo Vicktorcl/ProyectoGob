@@ -1,6 +1,8 @@
 {% extends 'core/base.html' %}
 {% load static %}
 
+{% block title %}Ingresar{% endblock title %}
+
 {% block content %}
 <div class="container border border-dark p-4" style="max-width:500px; margin:0 auto;">
   <h2 class="text-center mb-4">Ingreso de Usuario</h2>
@@ -51,7 +53,7 @@
 
     <div class="mt-3 text-center">
       <a href="{% url 'registro' %}">Registrarse</a> |
-      <a href="#">¿Olvidaste tu contraseña?</a>
+      <a href="{% url 'password_reset' %}">¿Olvidaste tu contraseña?</a>
     </div>
   </form>
 </div>

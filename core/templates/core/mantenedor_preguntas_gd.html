@@ -8,7 +8,6 @@
 <div class="container border border-dark p-4">
   <h2 class="text-center">Mantenedor de Preguntas GD</h2>
 
-  {# ------ BOTÓN PARA POBLAR BD GD (solo superusuario) ------ #}
   {% if user.is_superuser and user.is_active %}
     <div class="text-end mb-3">
       <a href="{% url 'zpoblar2' %}"
@@ -20,46 +19,126 @@
   {% endif %}
 
   {% if form %}
-    <form method="post" id="pregunta-gd-form">
+    <form method="post" novalidate>
       {% csrf_token %}
+
+      {# --- CÓDIGO --- #}
       {% if accion == 'crear' %}
         <div class="mb-3">
-          {{ form.codigo.label_tag }}
-          {{ form.codigo }}
-          {{ form.codigo.errors }}
+          <label for="{{ form.codigo.id_for_label }}" class="form-label">{{ form.codigo.label }}</label>
+          <input
+            type="text"
+            name="{{ form.codigo.html_name }}"
+            id="{{ form.codigo.id_for_label }}"
+            class="form-control{% if form.codigo.errors %} is-invalid{% endif %}"
+            placeholder="{{ form.codigo.field.widget.attrs.placeholder }}"
+            value="{{ form.codigo.value|default_if_none:'' }}"
+          >
+          {% for err in form.codigo.errors %}
+            <div class="invalid-feedback">{{ err }}</div>
+          {% endfor %}
         </div>
       {% else %}
         {{ form.codigo.as_hidden }}
       {% endif %}
+
+      {# --- GRUPO --- #}
       <div class="mb-3">
-        {{ form.grupo.label_tag }}
-        {{ form.grupo }}
-        {{ form.grupo.errors }}
+        <label for="{{ form.grupo.id_for_label }}" class="form-label">{{ form.grupo.label }}</label>
+        <input
+          type="text"
+          name="{{ form.grupo.html_name }}"
+          id="{{ form.grupo.id_for_label }}"
+          class="form-control{% if form.grupo.errors %} is-invalid{% endif %}"
+          placeholder="{{ form.grupo.field.widget.attrs.placeholder }}"
+          value="{{ form.grupo.value|default_if_none:'' }}"
+        >
+        {% for err in form.grupo.errors %}
+          <div class="invalid-feedback">{{ err }}</div>
+        {% endfor %}
       </div>
+
+      {# --- CATEGORÍA --- #}
       <div class="mb-3">
-        {{ form.categoria.label_tag }}
-        {{ form.categoria }}
-        {{ form.categoria.errors }}
+        <label for="{{ form.categoria.id_for_label }}" class="form-label">{{ form.categoria.label }}</label>
+        <input
+          type="text"
+          name="{{ form.categoria.html_name }}"
+          id="{{ form.categoria.id_for_label }}"
+          class="form-control{% if form.categoria.errors %} is-invalid{% endif %}"
+          placeholder="{{ form.categoria.field.widget.attrs.placeholder }}"
+          value="{{ form.categoria.value|default_if_none:'' }}"
+        >
+        {% for err in form.categoria.errors %}
+          <div class="invalid-feedback">{{ err }}</div>
+        {% endfor %}
       </div>
+
+      {# --- ÁREA --- #}
       <div class="mb-3">
-        {{ form.area.label_tag }}
-        {{ form.area }}
-        {{ form.area.errors }}
+        <label for="{{ form.area.id_for_label }}" class="form-label">{{ form.area.label }}</label>
+        <input
+          type="text"
+          name="{{ form.area.html_name }}"
+          id="{{ form.area.id_for_label }}"
+          class="form-control{% if form.area.errors %} is-invalid{% endif %}"
+          placeholder="{{ form.area.field.widget.attrs.placeholder }}"
+          value="{{ form.area.value|default_if_none:'' }}"
+        >
+        {% for err in form.area.errors %}
+          <div class="invalid-feedback">{{ err }}</div>
+        {% endfor %}
       </div>
+
+      {# --- TEXTO --- #}
       <div class="mb-3">
-        {{ form.texto.label_tag }}
-        {{ form.texto }}
-        {{ form.texto.errors }}
+        <label for="{{ form.texto.id_for_label }}" class="form-label">{{ form.texto.label }}</label>
+        <textarea
+          name="{{ form.texto.html_name }}"
+          id="{{ form.texto.id_for_label }}"
+          class="form-control{% if form.texto.errors %} is-invalid{% endif %}"
+          rows="{{ form.texto.field.widget.attrs.rows|default:'3' }}"
+          placeholder="{{ form.texto.field.widget.attrs.placeholder }}"
+        >{{ form.texto.value|default_if_none:'' }}</textarea>
+        {% for err in form.texto.errors %}
+          <div class="invalid-feedback">{{ err }}</div>
+        {% endfor %}
       </div>
+
+      {# --- PESO ÁREA --- #}
       <div class="mb-3">
-        {{ form.peso_area.label_tag }}
-        {{ form.peso_area }}
-        {{ form.peso_area.errors }}
+        <label for="{{ form.peso_area.id_for_label }}" class="form-label">{{ form.peso_area.label }}</label>
+        <input
+          type="number"
+          name="{{ form.peso_area.html_name }}"
+          id="{{ form.peso_area.id_for_label }}"
+          class="form-control{% if form.peso_area.errors %} is-invalid{% endif %}"
+          step="{{ form.peso_area.field.widget.attrs.step }}"
+          placeholder="{{ form.peso_area.field.widget.attrs.placeholder }}"
+          value="{{ form.peso_area.value|default_if_none:'' }}"
+        >
+        {% for err in form.peso_area.errors %}
+          <div class="invalid-feedback">{{ err }}</div>
+        {% endfor %}
       </div>
+
+      {# --- NIVEL --- #}
       <div class="mb-3">
-        {{ form.nivel.label_tag }}
-        {{ form.nivel }}
-        {{ form.nivel.errors }}
+        <label for="{{ form.nivel.id_for_label }}" class="form-label">{{ form.nivel.label }}</label>
+        <select
+          name="{{ form.nivel.html_name }}"
+          id="{{ form.nivel.id_for_label }}"
+          class="form-select{% if form.nivel.errors %} is-invalid{% endif %}"
+        >
+          {% for val,label in form.nivel.field.choices %}
+            <option value="{{ val }}" {% if form.nivel.value|stringformat:"s" == val|stringformat:"s" %}selected{% endif %}>
+              {{ label }}
+            </option>
+          {% endfor %}
+        </select>
+        {% for err in form.nivel.errors %}
+          <div class="invalid-feedback">{{ err }}</div>
+        {% endfor %}
       </div>
 
       <div class="mt-3 text-center">
@@ -80,50 +159,38 @@
 
 {% if preguntas %}
   <div class="container mt-4">
-
-    {# Buscador en vivo #}
     <div class="mb-3">
-      <input type="text"
-             id="buscadorPreguntasGD"
-             class="form-control"
-             placeholder="Buscar pregunta...">
+      <input
+        type="text"
+        id="buscadorPreguntasGD"
+        class="form-control"
+        placeholder="Buscar pregunta..."
+      >
     </div>
-
     <table class="table table-hover" id="tablaPreguntasGD">
       <thead class="table-light">
         <tr>
-          <th>PK</th>
-          <th>Código</th>
-          <th>Grupo</th>
-          <th>Categoría</th>
-          <th>Área</th>
-          <th>Texto</th>
-          <th>Peso Área</th>
-          <th>Nivel</th>
-          <th>Acciones</th>
+          <th>PK</th><th>Código</th><th>Grupo</th><th>Categoría</th><th>Área</th>
+          <th>Texto</th><th>Peso Área</th><th>Nivel</th><th>Acciones</th>
         </tr>
       </thead>
       <tbody>
         {% for p in preguntas %}
-        <tr>
-          <td>{{ p.pk }}</td>
-          <td>{{ p.codigo }}</td>
-          <td>{{ p.grupo }}</td>
-          <td>{{ p.categoria }}</td>
-          <td>{{ p.area }}</td>
-          <td>{{ p.texto|truncatechars:50 }}</td>
-          <td>{{ p.peso_area }}</td>
-          <td>{{ p.get_nivel_display }}</td>
-          <td>
-            <a href="{% url 'mantenedor_preguntas_gd' 'actualizar' p.pk %}"
-               class="btn btn-sm btn-primary">Editar</a>
-            <a href="{% url 'mantenedor_preguntas_gd' 'eliminar' p.pk %}"
-               class="btn btn-sm btn-danger"
-               onclick="return confirm('¿Eliminar esta pregunta GD?');">
-              Eliminar
-            </a>
-          </td>
-        </tr>
+          <tr>
+            <td>{{ p.pk }}</td><td>{{ p.codigo }}</td><td>{{ p.grupo }}</td>
+            <td>{{ p.categoria }}</td><td>{{ p.area }}</td>
+            <td>{{ p.texto|truncatechars:50 }}</td>
+            <td>{{ p.peso_area }}</td><td>{{ p.get_nivel_display }}</td>
+            <td>
+              <a href="{% url 'mantenedor_preguntas_gd' 'actualizar' p.pk %}"
+                 class="btn btn-sm btn-primary">Editar</a>
+              <a href="{% url 'mantenedor_preguntas_gd' 'eliminar' p.pk %}"
+                 class="btn btn-sm btn-danger"
+                 onclick="return confirm('¿Eliminar esta pregunta GD?');">
+                Eliminar
+              </a>
+            </td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>
@@ -133,22 +200,16 @@
 
 {% block script %}
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-  // Filtro en vivo
-  const input = document.getElementById('buscadorPreguntasGD');
-  if (input) {
-    const tbody = document
-      .getElementById('tablaPreguntasGD')
-      .querySelector('tbody');
-    input.addEventListener('keyup', () => {
-      const filtro = input.value.toLowerCase();
-      for (let row of tbody.rows) {
-        row.style.display = Array.from(row.cells)
-          .some(cell => cell.textContent.toLowerCase().includes(filtro))
-          ? '' : 'none';
-      }
+  document.addEventListener('DOMContentLoaded', () => {
+    const buscador = document.getElementById('buscadorPreguntasGD');
+    if (!buscador) return;
+    const filas = document.querySelectorAll('#tablaPreguntasGD tbody tr');
+    buscador.addEventListener('keyup', () => {
+      const texto = buscador.value.toLowerCase();
+      filas.forEach(f => {
+        f.style.display = f.textContent.toLowerCase().includes(texto) ? '' : 'none';
+      });
     });
-  }
-});
+  });
 </script>
 {% endblock %}

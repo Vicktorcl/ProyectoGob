@@ -23,7 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY        = os.environ['SECRET_KEY']
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-s&f92x^bztt53afi6l)oj-!1%aa6v9=ki@9p%lo!bu_wkx16c(')
 EMAIL_HOST_USER   = os.environ.get('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
 
@@ -166,7 +166,7 @@ MEDIA_ROOT = path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
 
 # Parámetros para inicio de sesión
-LOGIN_URL = '/ingresar'
+LOGIN_URL = '/ingresar/'
 LOGIN_REDIRECT_URL = '/'
 
 # Default primary key field type
