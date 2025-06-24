@@ -3,6 +3,15 @@
 
 {% block title %}Mantenedor de Preguntas{% endblock %}
 
+{% block extrahead %}
+<style>
+  /* Oculta los checkboxes DELETE de cada fila */
+  .opcion-form-row input[name$="-DELETE"] {
+    display: none;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container border border-dark p-4">
   <h2 class="text-center">Mantenedor de Preguntas</h2>
@@ -20,25 +29,8 @@
   <form method="post" id="pregunta-form" novalidate>
     {% csrf_token %}
 
-    {# --- Código (solo en crear) --- #}
-    {% if accion == 'crear' %}
-      <div class="mb-3">
-        {{ form.codigo.label_tag }}
-        <input
-          type="number"
-          name="{{ form.codigo.html_name }}"
-          id="{{ form.codigo.id_for_label }}"
-          class="form-control{% if form.codigo.errors %} is-invalid{% endif %}"
-          value="{{ form.codigo.value|default_if_none:'' }}"
-          readonly
-        >
-        {% for err in form.codigo.errors %}
-          <div class="invalid-feedback">{{ err }}</div>
-        {% endfor %}
-      </div>
-    {% else %}
-      {{ form.codigo.as_hidden }}
-    {% endif %}
+    {# --- Código siempre oculto --- #}
+    {{ form.codigo.as_hidden }}
 
     {# --- Dimensión --- #}
     <div class="mb-3">
@@ -86,8 +78,14 @@
 
     <hr>
     <h4>Opciones de Respuesta</h4>
-
     {{ formset.management_form }}
+
+    <!-- Botón para añadir nueva opción -->
+    <div class="mb-2 text-end">
+      <button type="button" class="btn btn-sm btn-outline-primary" id="add-option">
+        Añadir Opción
+      </button>
+    </div>
 
     <table class="table table-bordered" id="opciones-table">
       <thead class="table-light">
@@ -102,9 +100,10 @@
           <tr class="opcion-form-row">
             {{ subform.id }}
             {{ subform.orden.as_hidden }}
-            {{ subform.DELETE.as_hidden }}
-
-            {# Texto de la opción #}
+            {# Checkbox DELETE real, oculto por CSS #}
+            <td style="display:none;">
+              {{ subform.DELETE }}
+            </td>
             <td>
               <input
                 type="text"
@@ -117,8 +116,6 @@
                 <div class="invalid-feedback">{{ err }}</div>
               {% endfor %}
             </td>
-
-            {# Puntaje de la opción #}
             <td>
               <input
                 type="number"
@@ -132,7 +129,6 @@
                 <div class="invalid-feedback">{{ err }}</div>
               {% endfor %}
             </td>
-
             <td class="text-center align-middle">
               <button type="button" class="btn btn-sm btn-danger remove-option">
                 Eliminar
@@ -161,7 +157,6 @@
     </form>
   {% endif %}
 </div>
-
 
 {% if preguntas %}
   <div class="container mt-4">
@@ -208,29 +203,26 @@
 {% block script %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  // Añadir nueva opción
-  const addBtn    = document.getElementById('add-option');
-  const tableBody = document.querySelector('#opciones-table tbody');
+  const tableBody  = document.querySelector('#opciones-table tbody');
   const totalForms = document.getElementById('id_{{ formset.prefix }}-TOTAL_FORMS');
+  const addBtn     = document.getElementById('add-option');
 
-  addBtn?.addEventListener('click', () => {
-    const count = parseInt(totalForms.value, 10);
+  // Añadir nueva opción
+  addBtn.addEventListener('click', () => {
+    const count     = parseInt(totalForms.value, 10);
     const prototype = document.querySelector('.opcion-form-row');
-    const clone = prototype.cloneNode(true);
+    const clone     = prototype.cloneNode(true);
 
-    clone.querySelectorAll('input').forEach(el => {
-      const name = el.name || '';
-      const newName = name.replace(/-\d+-/, `-${count}-`);
-      el.name = newName;
-      el.id   = `id_${newName}`;
-      if (newName.endsWith('-DELETE')) {
-        el.checked = false;
-      } else if (newName.endsWith('-id')) {
-        el.value = '';
-      } else {
-        el.value = '';
-        el.classList.remove('is-invalid');
-      }
+    clone.querySelectorAll('input, textarea').forEach(el => {
+      if (!el.name) return;
+      const newName = el.name.replace(/-\d+-/, `-${count}-`);
+      el.name       = newName;
+      el.id         = `id_${newName}`;
+      // Resetear valores
+      if (newName.endsWith('-DELETE')) el.checked = false;
+      else if (newName.endsWith('-id')) el.value = '';
+      else el.value = '';
+      el.classList.remove('is-invalid');
     });
 
     clone.style.display = '';

@@ -3,21 +3,30 @@
 
 {% block title %}Reporte GD — Encuesta #{{ encuesta.id }}{% endblock %}
 
+{% block extrahead %}
+<style>
+  /* Para permitir scroll horizontal cuando algo sobrepase el ancho */
+  .responsive-container {
+    overflow-x: auto;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container my-5">
   <h2 class="text-center mb-4">
     Reporte GD de {{ encuesta.usuario.username }} — {{ encuesta.fecha|date:"Y-m-d H:i" }}
   </h2>
   <div class="row">
-    <!-- 1) Gráfico radar arriba, ancho completo, alto 400px -->
-    <div class="col-12 mb-4">
-      <div style="position: relative; width: 100%; height: 400px;">
+    <!-- 1) Gráfico radar arriba, ancho completo, alto 400px, con scroll si hiciera falta -->
+    <div class="col-12 mb-4 responsive-container">
+      <div style="position: relative; width: 100%; height: 400px; max-width: 100%;">
         <canvas id="radarChartGD"></canvas>
       </div>
     </div>
 
-    <!-- 2) Tabla jerárquica abajo -->
-    <div class="col-12">
+    <!-- 2) Tabla jerárquica abajo, ya dentro de table-responsive -->
+    <div class="col-12 responsive-container">
       <div class="table-responsive">
         <table class="table table-bordered align-middle">
           <thead class="table-light text-center">
@@ -45,7 +54,7 @@
               <td>{{ r.area }}</td>
               <td class="text-center">{{ r.nivel_area }}</td>
               <td class="text-center">
-                {# Peso Área estático según Tabla 177 #}
+                {% comment %} Peso Área estático según Tabla 177 {% endcomment %}
                 {% if r.area == "Principios relacionados con los datos" %}100
                 {% elif r.area == "Metas, objetivos y estrategias de la GD" %}60
                 {% elif r.area == "Necesidades de información" %}40
