@@ -8,7 +8,7 @@ from core.templatetags.custom_filters import formatear_dinero
 # ------------------------------------------------------------------
 class Perfil(models.Model):
     usuario = models.OneToOneField(User, on_delete=models.CASCADE)
-    rut = models.CharField(max_length=15, verbose_name='Rut de la empresa')
+    rut = models.CharField(max_length=15, verbose_name='Rut de la empresa', blank=True, null=True)
     nombre_empresa = models.CharField(max_length=100, verbose_name='Nombre de la empresa', unique=True)
 
     class Meta:

@@ -283,6 +283,7 @@ class RegistroPerfilForm(forms.ModelForm):
     rut = forms.CharField(
         label='RUT',
         max_length=12,
+        required=False, 
         validators=[
             RegexValidator(
                 regex=r'^\d{1,2}\.?\d{3}\.?\d{3}-[\dkK]$',
@@ -309,12 +310,20 @@ class RegistroPerfilForm(forms.ModelForm):
         fields = ['rut', 'nombre_empresa']
 
     def clean_rut(self):
-        rut = self.cleaned_data['rut']
-        # opcional: comprueba dígito verificador
-        num, dv = rut.split('-')
+        rut = self.cleaned_data.get('rut')
+        # 1) Si viene vacío, lo dejamos pasar
+        if not rut:
+            return rut
+
+        # 2) Intentamos separar en número y dígito
+        parts = rut.split('-', 1)
+        if len(parts) != 2:
+            raise ValidationError(
+                'Formato inválido: debe tener un guión. Ej: 12.345.678-5'
+            )
+        num, dv = parts
         num = num.replace('.', '')
-        # aquí podrías llamar a tu función de validación de DV
-        # if not valida_dv(num, dv): raise ValidationError('DV no corresponde')
+        # aquí podrías validar el dígito verificador dv…
         return rut
 
 # Formulario para editar datos de usuario
@@ -331,6 +340,7 @@ class PerfilForm(forms.ModelForm):
     rut = forms.CharField(
         label='RUT',
         max_length=12,
+        required=False, 
         validators=[RegexValidator(
             regex=r'^\d{1,2}\.?\d{3}\.?\d{3}-[\dkK]$',
             message='Formato inválido. Ej: 12.345.678-6'
@@ -354,12 +364,20 @@ class PerfilForm(forms.ModelForm):
         fields = ['rut', 'nombre_empresa']
 
     def clean_rut(self):
-        rut = self.cleaned_data['rut']
-        # opcional: comprueba dígito verificador
-        num, dv = rut.split('-')
+        rut = self.cleaned_data.get('rut')
+        # 1) Si viene vacío, lo dejamos pasar
+        if not rut:
+            return rut
+
+        # 2) Intentamos separar en número y dígito
+        parts = rut.split('-', 1)
+        if len(parts) != 2:
+            raise ValidationError(
+                'Formato inválido: debe tener un guión. Ej: 12.345.678-6'
+            )
+        num, dv = parts
         num = num.replace('.', '')
-        # aquí podrías llamar a tu función de validación de DV
-        # if not valida_dv(num, dv): raise ValidationError('DV no corresponde')
+        # aquí podrías validar el dígito verificador dv…
         return rut
 
 
