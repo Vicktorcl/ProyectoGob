@@ -98,9 +98,9 @@
 
       {# — Campos de Perfil (lado derecho) — #}
       <div class="col-md-6">
-        {# RUT #}
+        {# RUT (Ahora Opcional) #}
         <div class="mb-3 text-start">
-          <label for="id_rut" class="form-label">RUT</label>
+          <label for="id_rut" class="form-label">RUT <span class="text-muted">(Opcional)</span></label>
           <input
             type="text"
             name="rut"
@@ -108,7 +108,6 @@
             class="form-control {% if form_perfil.rut.errors %}is-invalid{% endif %}"
             placeholder="12.345.678-5"
             value="{{ form_perfil.rut.value|default_if_none:'' }}"
-            required
           >
           {% for err in form_perfil.rut.errors %}
             <div class="invalid-feedback">{{ err }}</div>

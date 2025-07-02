@@ -291,10 +291,8 @@ class RegistroPerfilForm(forms.ModelForm):
         ],
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': '12.345.678-5',
-            'required': True,
-        }),
-        error_messages={'required': 'El RUT es obligatorio.'},
+            'placeholder': '12.345.678-6',
+        })
     )
     nombre_empresa = forms.CharField(
         label='Nombre de la empresa',
@@ -335,13 +333,12 @@ class PerfilForm(forms.ModelForm):
         max_length=12,
         validators=[RegexValidator(
             regex=r'^\d{1,2}\.?\d{3}\.?\d{3}-[\dkK]$',
-            message='Formato inválido. Ej: 12.345.678-5'
+            message='Formato inválido. Ej: 12.345.678-6'
         )],
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': '12.345.678-5',
-        }),
-        error_messages={'required': 'El RUT es obligatorio.'},
+            'placeholder': '12.345.678-6',
+        })
     )
     nombre_empresa = forms.CharField(
         label='Nombre de la empresa',
